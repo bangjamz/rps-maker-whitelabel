@@ -16,6 +16,7 @@ import AttendanceMarkingPage from './pages/AttendanceMarkingPage';
 import EnrollmentManagementPage from './pages/EnrollmentManagementPage';
 import RPSEditorPage from './pages/RPSEditorPage';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
+import CPLAnalyticsPage from './pages/CPLAnalyticsPage';
 import { ROLES } from './utils/permissions';
 
 function App() {
@@ -50,6 +51,7 @@ function App() {
                                     <Route path="rps/:rpsId/edit" element={<RPSEditorPage />} />
                                     <Route path="reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Page (Coming Soon)</h1></div>} />
                                     <Route path="analytics" element={<AnalyticsDashboardPage />} />
+                                    <Route path="cpl-analytics" element={<CPLAnalyticsPage />} />
                                 </Routes>
                             </DashboardLayout>
                         </ProtectedRoute>
