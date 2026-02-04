@@ -1,0 +1,93 @@
+# ========================================
+# RPS Management System - .gitignore
+# Fullstack: Node.js (Express) + React (Vite)
+# ========================================
+
+# ============ DEPENDENCIES ============
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============ ENVIRONMENT ============
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# ============ BUILD OUTPUTS ============
+dist/
+build/
+client/dist/
+client/build/
+server/dist/
+server/build/
+.vite/
+*.local
+
+# ============ LOGS ============
+*.log
+npm-debug.log*
+logs/
+
+# ============ DATABASE ============
+# PostgreSQL
+*.sql.backup
+*.dump
+pgdata/
+
+# SQLite (if used for dev)
+*.sqlite
+*.sqlite3
+*.db
+
+# ============ IDE / EDITOR ============
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ============ OS FILES ============
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+.Spotlight-V100
+.Trashes
+
+# ============ TESTING ============
+coverage/
+*.lcov
+.nyc_output/
+
+# ============ UPLOADS & MEDIA ============
+uploads/
+public/uploads/
+*.upload
+
+# ============ CERTIFICATES & KEYS ============
+*.pem
+*.key
+*.cert
+*.crt
+
+# ============ CACHE ============
+.cache/
+.parcel-cache/
+.eslintcache
+
+# ============ MISC ============
+tmp/
+temp/
+*.tmp
