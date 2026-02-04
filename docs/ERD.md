@@ -97,7 +97,7 @@ erDiagram
     
     mahasiswa {
         int id PK
-        int user_id FK_UK
+        int user_id FK "UK"
         int prodi_id FK
         string npm UK
         string nama
@@ -109,7 +109,7 @@ erDiagram
     
     dosen {
         int id PK
-        int user_id FK_UK
+        int user_id FK "UK"
         int prodi_id FK
         string nidn UK
         string nama
