@@ -9,6 +9,7 @@ import CurriculumPage from './pages/CurriculumPage';
 import CoursesPage from './pages/CoursesPage';
 import RPSViewPage from './pages/RPSViewPage';
 import LecturerAssignmentPage from './pages/LecturerAssignmentPage';
+import RPSManagementPage from './pages/RPSManagementPage';
 import { ROLES } from './utils/permissions';
 
 function App() {
@@ -37,7 +38,7 @@ function App() {
                                     <Route path="courses" element={<CoursesPage />} />
                                     <Route path="lecturer-assignments" element={<LecturerAssignmentPage />} />
                                     <Route path="rps/:courseId" element={<RPSViewPage />} />
-                                    <Route path="rps" element={<div className="p-6"><h1 className="text-2xl font-bold">Kelola RPS (Coming Soon)</h1></div>} />
+                                    <Route path="rps" element={<RPSManagementPage />} />
                                     <Route path="reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Page (Coming Soon)</h1></div>} />
                                 </Routes>
                             </DashboardLayout>

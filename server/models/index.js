@@ -17,6 +17,12 @@ import PertemuanCPMK from './PertemuanCPMK.js';
 import PenilaianMK from './PenilaianMK.js';
 import NilaiMahasiswa from './NilaiMahasiswa.js';
 import DosenAssignment from './DosenAssignment.js';
+import GradingSystem from './GradingSystem.js';
+import GradeScale from './GradeScale.js';
+import GradeScaleDetail from './GradeScaleDetail.js';
+import AssessmentComponent from './AssessmentComponent.js';
+import StudentGrade from './StudentGrade.js';
+import FinalGrade from './FinalGrade.js';
 
 // Define associations
 
@@ -189,10 +195,16 @@ export {
     BahanKajian,
     MKBahanKajian,
     Mahasiswa,
-    DosenAssignment,
     RPS,
     RPSPertemuan,
     PertemuanCPMK,
     PenilaianMK,
-    NilaiMahasiswa
+    NilaiMahasiswa,
+    DosenAssignment,
+    GradingSystem,
+    GradeScale,
+    GradeScaleDetail,
+    AssessmentComponent,
+    StudentGrade,
+    FinalGrade
 };
