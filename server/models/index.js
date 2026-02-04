@@ -11,7 +11,6 @@ import SubCPMK from './SubCPMK.js';
 import BahanKajian from './BahanKajian.js';
 import MKBahanKajian from './MKBahanKajian.js';
 import Mahasiswa from './Mahasiswa.js';
-import Dosen from './Dosen.js';
 import RPS from './RPS.js';
 import RPSPertemuan from './RPSPertemuan.js';
 import PertemuanCPMK from './PertemuanCPMK.js';
@@ -286,6 +285,5 @@ export {
     StudentGrade,
     FinalGrade,
     Attendance,
-    Enrollment,
-    Dosen
+    Enrollment
 };

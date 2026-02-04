@@ -2,7 +2,6 @@ import {
     RPS,
     RPSPertemuan,
     MataKuliah,
-    Dosen,
     CPL,
     CPMK,
     SubCPMK,
@@ -228,11 +227,13 @@ export const getDosenCourses = async (req, res) => {
             return res.status(404).json({ message: 'Dosen profile not found' });
         }
 
-        // TODO: Get courses via dosen_assignment table
-        // For now, return all courses in Dosen's prodi
-        const dosen = await Dosen.findByPk(dosenId);
+        // Get all courses in Dosen's prodi
+        const user = await User.findByPk(req.user.id, {
+            include: [{ model: Prodi, as: 'prodi' }]
+        });
+
         const courses = await MataKuliah.findAll({
-            where: { prodi_id: dosen.prodi_id },
+            where: { prodi_id: user.prodi_id },
             order: [['kode_mk', 'ASC']]
         });
 
