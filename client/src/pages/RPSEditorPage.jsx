@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Save, Send, ArrowLeft, Plus, Calendar, Trash2 } from 'lucide-react';
-import DataGrid from 'react-data-grid';
+import { DataGrid } from 'react-data-grid';
 import { debounce } from 'lodash';
 import axios from '../lib/axios';
 import 'react-data-grid/lib/styles.css';
