@@ -4,6 +4,7 @@ import { seedInstitutCPL, seedFakultasCPL, seedProdiCPL, seedProfilLulusan } fro
 import { seedBahanKajian } from './kurikulum.js';
 import { seedMataKuliah, seedCPMK, seedMahasiswa } from './masterData.js';
 import { seedUsers, seedDosenAssignments } from './userData.js';
+import { seedDummyData } from './dummyData.js';
 
 const runSeeder = async () => {
     try {
@@ -44,7 +45,10 @@ const runSeeder = async () => {
         await seedBahanKajian();
 
         // Mata Kuliah (for Informatika)
-        const mkList = await seedMataKuliah(prodiInformatika.id);
+        const fakultasTeknik = fakultasList.find(f => f.kode === 'FT'); // Assuming Kode FT for Teknik, or based on index
+        const fakultasTeknikId = fakultasTeknik?.id || fakultasList[0].id;
+
+        const mkList = await seedMataKuliah(prodiInformatika.id, institusi.id, fakultasTeknikId);
 
         // CPMK Templates (using prodi-level CPL)
         console.log('\n📚 Seeding CPMK Templates...');
@@ -64,6 +68,9 @@ const runSeeder = async () => {
         console.log('─'.repeat(60));
 
         await seedMahasiswa(prodiInformatika.id);
+
+        // Dummy Data (Assignments & Enrollments)
+        await seedDummyData();
 
         // ========== SUMMARY ==========
         console.log('\n' + '═'.repeat(60));

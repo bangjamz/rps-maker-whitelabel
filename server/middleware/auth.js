@@ -37,7 +37,7 @@ export const authenticate = async (req, res, next) => {
             include: [
                 { model: Institusi, as: 'institusi', attributes: ['id', 'nama'] },
                 { model: Fakultas, as: 'fakultas', attributes: ['id', 'kode', 'nama'] },
-                { model: Prodi, as: 'prodi', attributes: ['id', 'kode', 'nama', 'jenjang'] }
+                { model: Prodi, as: 'prodi', attributes: ['id', 'kode', 'nama', 'jenjang', 'fakultas_id'] }
             ]
         });
 

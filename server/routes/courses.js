@@ -16,8 +16,8 @@ router.use(authenticate);
 // Course routes
 router.get('/', getAllCourses);
 router.get('/:id', getCourseById);
-router.post('/', authorize(['kaprodi']), createCourse);
-router.put('/:id', authorize(['kaprodi']), updateCourse);
-router.delete('/:id', authorize(['kaprodi']), deleteCourse);
+router.post('/', authorize('kaprodi'), createCourse);
+router.put('/:id', authorize('kaprodi'), updateCourse);
+router.delete('/:id', authorize('kaprodi'), deleteCourse);
 
 export default router;

@@ -2,64 +2,75 @@ import { MataKuliah, CPMK, CPL, User, Mahasiswa } from '../models/index.js';
 import bcrypt from 'bcryptjs';
 
 // Seed Mata Kuliah dari data mapping
-export const seedMataKuliah = async (prodiId) => {
+export const seedMataKuliah = async (prodiId, institusiId, fakultasId) => {
     const mkData = [
-        { prodi_id: prodiId, kode_mk: 'MK01', nama_mk: 'Etika dan Profesi', sks: 2, semester: 3 },
-        { prodi_id: prodiId, kode_mk: 'MK02', nama_mk: 'Hukum dan Kebijakan Teknologi Informasi', sks: 2, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK03', nama_mk: 'Manajemen Proyek Teknologi Informasi', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK04', nama_mk: 'Proyek Software', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK05', nama_mk: 'Struktur Data', sks: 3, semester: 2 },
-        { prodi_id: prodiId, kode_mk: 'MK06', nama_mk: 'Algoritma Pemrograman', sks: 3, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK07', nama_mk: 'Keamanan Data dan Informasi', sks: 3, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK08', nama_mk: 'Rekayasa Perangkat Lunak', sks: 3, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK09', nama_mk: 'Analisis dan Desain Perangkat Lunak', sks: 3, semester: 4 },
-        { prodi_id: prodiId, kode_mk: 'MK10', nama_mk: 'Pemrograman Web', sks: 3, semester: 3 },
-        { prodi_id: prodiId, kode_mk: 'MK11', nama_mk: 'Pembelajaran Mesin', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK12', nama_mk: 'Kecerdasan Buatan', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK13', nama_mk: 'Jaringan Komputer', sks: 3, semester: 4 },
-        { prodi_id: prodiId, kode_mk: 'MK14', nama_mk: 'Pemrograman Berorientasi Objek', sks: 3, semester: 2 },
-        { prodi_id: prodiId, kode_mk: 'MK15', nama_mk: 'Pendidikan Agama', sks: 2, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK16', nama_mk: 'Pancasila dan Kewarganegaraan', sks: 2, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK17', nama_mk: 'Bahasa Indonesia', sks: 2, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK18', nama_mk: 'Organisasi dan Arsitektur Komputer', sks: 3, semester: 3 },
-        { prodi_id: prodiId, kode_mk: 'MK19', nama_mk: 'Matematika Diskrit', sks: 3, semester: 2 },
-        { prodi_id: prodiId, kode_mk: 'MK20', nama_mk: 'Aljabar Linier', sks: 3, semester: 2 },
-        { prodi_id: prodiId, kode_mk: 'MK21', nama_mk: 'Kalkulus', sks: 3, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK22', nama_mk: 'Human-Computer Interaction', sks: 3, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK23', nama_mk: 'Sistem Operasi', sks: 3, semester: 3 },
-        { prodi_id: prodiId, kode_mk: 'MK24', nama_mk: 'Basis Data', sks: 3, semester: 3 },
-        { prodi_id: prodiId, kode_mk: 'MK25', nama_mk: 'Statistika', sks: 3, semester: 4 },
-        { prodi_id: prodiId, kode_mk: 'MK26', nama_mk: 'Logika Informatika', sks: 3, semester: 2 },
-        { prodi_id: prodiId, kode_mk: 'MK27', nama_mk: 'Cloud Computing 1: Pengantar', sks: 3, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK28', nama_mk: 'Pemrograman Mobile 1', sks: 3, semester: 4 },
-        { prodi_id: prodiId, kode_mk: 'MK30', nama_mk: 'Big Data', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK31', nama_mk: 'Tugas Akhir', sks: 6, semester: 8 },
-        { prodi_id: prodiId, kode_mk: 'MK32', nama_mk: 'Internet of Things', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK33', nama_mk: 'Tata Tulis Ilmiah Komputer dan Informatika', sks: 2, semester: 4 },
-        { prodi_id: prodiId, kode_mk: 'MK34', nama_mk: 'Cloud Computing 2', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK35', nama_mk: 'Big Data 2: Predictive Analysis Lanjutan', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK36', nama_mk: 'Pemrograman Mobile 2', sks: 3, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK37', nama_mk: 'Seminar Tugas Akhir', sks: 2, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK38', nama_mk: 'Bahasa Inggris 1', sks: 2, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK39', nama_mk: 'Pengantar Ilmu Komputer', sks: 3, semester: 1 },
-        { prodi_id: prodiId, kode_mk: 'MK40', nama_mk: 'Digipreneur', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK42', nama_mk: 'Komputer Desain Grafis', sks: 3, semester: 4 },
-        { prodi_id: prodiId, kode_mk: 'MK43', nama_mk: 'Manajemen Teknologi Informasi', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK44', nama_mk: 'Film dan Animasi', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK46', nama_mk: 'Manajemen Sains dan Riset Operasional', sks: 3, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK47', nama_mk: 'Pemasaran Digital', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK48', nama_mk: 'Manajemen Strategik', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK49', nama_mk: 'Rekam Medis Elektronik', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK50', nama_mk: 'Visualisasi Data', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK51', nama_mk: 'Interpersonal Skill', sks: 2, semester: 5 },
-        { prodi_id: prodiId, kode_mk: 'MK52', nama_mk: 'E-Government dan Smart City', sks: 3, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK53', nama_mk: 'Analisis Jejaring Sosial', sks: 3, semester: 6 },
-        { prodi_id: prodiId, kode_mk: 'MK54', nama_mk: 'Promosi Kesehatan', sks: 2, semester: 7 },
-        { prodi_id: prodiId, kode_mk: 'MK55', nama_mk: 'MBKM', sks: 20, semester: 7 }
+        // INSTITUSI LEVEL (Scope: Institusi)
+        // ----------------------------------------------------------------
+        { prodi_id: null, kode_mk: 'MK15', nama_mk: 'Pendidikan Agama', sks: 2, semester: 1, scope: 'institusi' },
+        { prodi_id: null, kode_mk: 'MK16', nama_mk: 'Pancasila dan Kewarganegaraan', sks: 2, semester: 1, scope: 'institusi' },
+        { prodi_id: null, kode_mk: 'MK17', nama_mk: 'Bahasa Indonesia', sks: 2, semester: 1, scope: 'institusi' },
+        { prodi_id: null, kode_mk: 'MK38', nama_mk: 'Bahasa Inggris 1', sks: 2, semester: 1, scope: 'institusi' },
+        { prodi_id: null, kode_mk: 'MK51', nama_mk: 'Interpersonal Skill', sks: 2, semester: 5, scope: 'institusi' },
+        { prodi_id: null, kode_mk: 'MK55', nama_mk: 'MBKM', sks: 20, semester: 7, scope: 'institusi' },
+
+        // FAKULTAS LEVEL (Scope: Fakultas - e.g., Teknik)
+        // ----------------------------------------------------------------
+        { prodi_id: null, fakultas_id: fakultasId, kode_mk: 'MK21', nama_mk: 'Kalkulus', sks: 3, semester: 1, scope: 'fakultas' },
+        { prodi_id: null, fakultas_id: fakultasId, kode_mk: 'MK20', nama_mk: 'Aljabar Linier', sks: 3, semester: 2, scope: 'fakultas' },
+        { prodi_id: null, fakultas_id: fakultasId, kode_mk: 'MK25', nama_mk: 'Statistika', sks: 3, semester: 4, scope: 'fakultas' },
+
+        // PRODI LEVEL (Scope: Prodi - Informatika)
+        // ----------------------------------------------------------------
+        { prodi_id: prodiId, kode_mk: 'MK01', nama_mk: 'Etika dan Profesi', sks: 2, semester: 3, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK02', nama_mk: 'Hukum dan Kebijakan Teknologi Informasi', sks: 2, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK03', nama_mk: 'Manajemen Proyek Teknologi Informasi', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK04', nama_mk: 'Proyek Software', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK05', nama_mk: 'Struktur Data', sks: 3, semester: 2, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK06', nama_mk: 'Algoritma Pemrograman', sks: 3, semester: 1, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK07', nama_mk: 'Keamanan Data dan Informasi', sks: 3, semester: 5, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK08', nama_mk: 'Rekayasa Perangkat Lunak', sks: 3, semester: 5, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK09', nama_mk: 'Analisis dan Desain Perangkat Lunak', sks: 3, semester: 4, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK10', nama_mk: 'Pemrograman Web', sks: 3, semester: 3, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK11', nama_mk: 'Pembelajaran Mesin', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK12', nama_mk: 'Kecerdasan Buatan', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK13', nama_mk: 'Jaringan Komputer', sks: 3, semester: 4, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK14', nama_mk: 'Pemrograman Berorientasi Objek', sks: 3, semester: 2, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK18', nama_mk: 'Organisasi dan Arsitektur Komputer', sks: 3, semester: 3, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK19', nama_mk: 'Matematika Diskrit', sks: 3, semester: 2, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK22', nama_mk: 'Human-Computer Interaction', sks: 3, semester: 5, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK23', nama_mk: 'Sistem Operasi', sks: 3, semester: 3, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK24', nama_mk: 'Basis Data', sks: 3, semester: 3, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK26', nama_mk: 'Logika Informatika', sks: 3, semester: 2, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK27', nama_mk: 'Cloud Computing 1: Pengantar', sks: 3, semester: 5, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK28', nama_mk: 'Pemrograman Mobile 1', sks: 3, semester: 4, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK30', nama_mk: 'Big Data', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK31', nama_mk: 'Tugas Akhir', sks: 6, semester: 8, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK32', nama_mk: 'Internet of Things', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK33', nama_mk: 'Tata Tulis Ilmiah Komputer dan Informatika', sks: 2, semester: 4, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK34', nama_mk: 'Cloud Computing 2', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK35', nama_mk: 'Big Data 2: Predictive Analysis Lanjutan', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK36', nama_mk: 'Pemrograman Mobile 2', sks: 3, semester: 5, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK37', nama_mk: 'Seminar Tugas Akhir', sks: 2, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK39', nama_mk: 'Pengantar Ilmu Komputer', sks: 3, semester: 1, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK40', nama_mk: 'Digipreneur', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK42', nama_mk: 'Komputer Desain Grafis', sks: 3, semester: 4, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK43', nama_mk: 'Manajemen Teknologi Informasi', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK44', nama_mk: 'Film dan Animasi', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK46', nama_mk: 'Manajemen Sains dan Riset Operasional', sks: 3, semester: 5, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK47', nama_mk: 'Pemasaran Digital', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK48', nama_mk: 'Manajemen Strategik', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK49', nama_mk: 'Rekam Medis Elektronik', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK50', nama_mk: 'Visualisasi Data', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK52', nama_mk: 'E-Government dan Smart City', sks: 3, semester: 7, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK53', nama_mk: 'Analisis Jejaring Sosial', sks: 3, semester: 6, scope: 'prodi' },
+        { prodi_id: prodiId, kode_mk: 'MK54', nama_mk: 'Promosi Kesehatan', sks: 2, semester: 7, scope: 'prodi' }
     ];
 
     const mataKuliah = await MataKuliah.bulkCreate(mkData);
     console.log(`✅ Seeded ${mataKuliah.length} Mata Kuliah`);
+    console.log('   - Scope Institusi: 6');
+    console.log('   - Scope Fakultas: 3');
+    console.log('   - Scope Prodi: 43');
     return mataKuliah;
 };
 

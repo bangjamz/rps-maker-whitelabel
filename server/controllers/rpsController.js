@@ -60,7 +60,7 @@ export const getAllRPS = async (req, res) => {
                 },
                 {
                     model: User,
-                    as: 'approved_by_user',
+                    as: 'approver',
                     attributes: ['id', 'nama_lengkap'],
                     required: false
                 },
@@ -108,7 +108,7 @@ export const getRPSById = async (req, res) => {
                 },
                 {
                     model: User,
-                    as: 'approved_by_user',
+                    as: 'approver',
                     attributes: ['id', 'nama_lengkap', 'email'],
                     required: false
                 },

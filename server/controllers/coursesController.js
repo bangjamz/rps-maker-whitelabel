@@ -1,9 +1,39 @@
 import { MataKuliah } from '../models/index.js';
 
+import { Op } from 'sequelize';
+
 // Get all mata kuliah
 export const getAllCourses = async (req, res) => {
     try {
+        const user = req.user;
+        const prodiId = user.prodi_id;
+        // Get fakultas_id directly from user (Dekan) or from prodi (Dosen/Mahasiswa/Kaprodi)
+        const fakultasId = user.fakultas_id || user.prodi?.fakultas_id;
+
+        const whereClause = {
+            [Op.or]: [
+                // 1. Institusi Level (Visible to everyone)
+                { scope: 'institusi' },
+
+                // 2. Fakultas Level (Visible if user belongs to that faculty)
+                ...(fakultasId ? [{
+                    scope: 'fakultas',
+                    fakultas_id: fakultasId
+                }] : []),
+
+                // 3. Prodi Level (Visible if user belongs to that prodi)
+                ...(prodiId ? [{
+                    scope: 'prodi',
+                    prodi_id: prodiId
+                }] : [])
+            ]
+        };
+
+        // If user is Admin Institusi, show all
+        const finalWhere = user.role === 'admin_institusi' ? {} : whereClause;
+
         const courses = await MataKuliah.findAll({
+            where: finalWhere,
             order: [['semester', 'ASC'], ['kode_mk', 'ASC']]
         });
 
@@ -56,7 +86,7 @@ export const createCourse = async (req, res) => {
 export const updateCourse = async (req, res) => {
     try {
         const { id } = req.params;
-        const { kode_mk, nama_mk, sks, semester } = req.body;
+        const { kode_mk, nama_mk, sks, semester, scope, fakultas_id, prodi_id } = req.body;
 
         const course = await MataKuliah.findByPk(id);
 
@@ -68,7 +98,10 @@ export const updateCourse = async (req, res) => {
             kode_mk,
             nama_mk,
             sks,
-            semester
+            semester,
+            scope,
+            fakultas_id,
+            prodi_id
         });
 
         res.json(course);

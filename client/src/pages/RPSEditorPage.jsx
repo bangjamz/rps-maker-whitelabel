@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Save, Send, ArrowLeft, Plus, Calendar, Trash2 } from 'lucide-react';
 import { DataGrid } from 'react-data-grid';
 import { debounce } from 'lodash';
@@ -9,6 +9,7 @@ import 'react-data-grid/lib/styles.css';
 export default function RPSEditorPage() {
     const { rpsId } = useParams(); // If editing existing RPS
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -34,12 +35,23 @@ export default function RPSEditorPage() {
         fetchCourses();
         if (rpsId) {
             fetchExistingRPS();
+        } else if (location.state?.courseId) {
+            // Pre-select course from navigation state
+            setFormData(prev => ({
+                ...prev,
+                mata_kuliah_id: location.state.courseId,
+                semester: location.state.semester || 'Ganjil',
+                tahun_ajaran: location.state.tahunAjaran || '2025/2026'
+            }));
+            // Trigger curriculum fetch for pre-selected course
+            // We need to wait for courses to be loaded or just fetch specifically
+            // For now, we'll let handleCourseChange logic run if we can, or just set it
         }
-    }, [rpsId]);
+    }, [rpsId, location.state]);
 
     const fetchCourses = async () => {
         try {
-            const res = await axios.get('/api/rps/dosen/my-courses');
+            const res = await axios.get('/rps/dosen/my-courses');
             setCourses(res.data);
         } catch (error) {
             console.error('Error fetching courses:', error);
@@ -49,7 +61,7 @@ export default function RPSEditorPage() {
     const fetchExistingRPS = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`/api/rps/${rpsId}`);
+            const res = await axios.get(`/rps/${rpsId}`);
             const rps = res.data;
 
             setFormData({
@@ -87,7 +99,7 @@ export default function RPSEditorPage() {
             const course = courses.find(c => c.id === mata_kuliah_id);
             if (course) {
                 try {
-                    const res = await axios.get(`/api/rps/curriculum/tree/${course.prodi_id}`);
+                    const res = await axios.get(`/rps/curriculum/tree/${course.prodi_id}`);
                     setCurriculumTree(res.data.cpls || []);
                 } catch (error) {
                     console.error('Error fetching curriculum tree:', error);
@@ -153,7 +165,7 @@ export default function RPSEditorPage() {
                 className="w-full h-full px-2 border-0 outline-none"
                 autoFocus
             >
-                <option value="">Select Sub-CPMK...</option>
+                <option value="">Pilih Sub-CPMK...</option>
                 {options.map(sub => (
                     <option key={sub.id} value={sub.id}>
                         {sub.kode}: {sub.deskripsi.substring(0, 50)}...
@@ -167,7 +179,7 @@ export default function RPSEditorPage() {
     const columns = [
         {
             key: 'pertemuan_ke',
-            name: 'Week',
+            name: 'Minggu Ke',
             width: 80,
             frozen: true,
             renderCell: ({ row }) => (
@@ -176,14 +188,14 @@ export default function RPSEditorPage() {
         },
         {
             key: 'tanggal',
-            name: 'Date',
+            name: 'Tanggal',
             width: 120,
             renderEditCell: DateEditor,
             editable: true
         },
         {
             key: 'topik',
-            name: 'Topic',
+            name: 'Topik / Bahan Kajian',
             width: 200,
             editable: true
         },
@@ -204,19 +216,19 @@ export default function RPSEditorPage() {
         },
         {
             key: 'metode_pembelajaran',
-            name: 'Teaching Method',
+            name: 'Metode Pembelajaran',
             width: 150,
             editable: true
         },
         {
             key: 'materi',
-            name: 'Materials',
+            name: 'Materi Pembelajaran',
             width: 200,
             editable: true
         },
         {
             key: 'bentuk_evaluasi',
-            name: 'Evaluation',
+            name: 'Bentuk Evaluasi',
             width: 150,
             editable: true
         }
@@ -233,7 +245,7 @@ export default function RPSEditorPage() {
 
             try {
                 setSaving(true);
-                await axios.post(`/api/rps/dosen/${currentRPSId}/pertemuan/bulk`, {
+                await axios.post(`/rps/dosen/${currentRPSId}/pertemuan/bulk`, {
                     pertemuan: rowsToSave
                 });
                 console.log('Auto-saved pertemuan');
@@ -264,11 +276,11 @@ export default function RPSEditorPage() {
 
     const handleAutoFillDates = () => {
         if (rows.length === 0) {
-            alert('Please add rows first');
+            alert('Mohon tambahkan baris terlebih dahulu');
             return;
         }
 
-        const startDate = prompt('Enter start date (YYYY-MM-DD):');
+        const startDate = prompt('Masukkan tanggal mulai (YYYY-MM-DD):');
         if (!startDate) return;
 
         const updatedRows = rows.map((row, index) => {
@@ -284,7 +296,7 @@ export default function RPSEditorPage() {
     };
 
     const handleClearAll = () => {
-        if (confirm('Clear all pertemuan data?')) {
+        if (confirm('Hapus semua data pertemuan?')) {
             setRows([]);
         }
     };
@@ -295,7 +307,7 @@ export default function RPSEditorPage() {
 
             if (!currentRPSId) {
                 // Create new RPS
-                const res = await axios.post('/api/rps/dosen/create', {
+                const res = await axios.post('/rps/dosen/create', {
                     ...formData,
                     cpl_ids: selectedCPLs,
                     cpmk_ids: selectedCPMKs
@@ -304,7 +316,7 @@ export default function RPSEditorPage() {
                 alert('RPS created as Draft');
             } else {
                 // Update existing
-                await axios.put(`/api/rps/dosen/${currentRPSId}/update`, {
+                await axios.put(`/rps/dosen/${currentRPSId}/update`, {
                     deskripsi_mk: formData.deskripsi_mk,
                     cpl_ids: selectedCPLs,
                     cpmk_ids: selectedCPMKs
@@ -314,7 +326,7 @@ export default function RPSEditorPage() {
 
             // Save pertemuan
             if (rows.length > 0) {
-                await axios.post(`/api/rps/dosen/${currentRPSId}/pertemuan/bulk`, {
+                await axios.post(`/rps/dosen/${currentRPSId}/pertemuan/bulk`, {
                     pertemuan: rows
                 });
             }
@@ -332,12 +344,12 @@ export default function RPSEditorPage() {
         try {
             setLoading(true);
             await handleSaveDraft();
-            await axios.put(`/api/rps/${currentRPSId}/submit`);
-            alert('RPS submitted for approval!');
+            await axios.put(`/rps/${currentRPSId}/submit`);
+            alert('RPS berhasil disubmit untuk approval!');
             navigate('/dosen/rps');
         } catch (error) {
             console.error('Error submitting RPS:', error);
-            alert('Failed to submit RPS');
+            alert('Gagal mensubmit RPS');
         } finally {
             setLoading(false);
         }
@@ -359,25 +371,25 @@ export default function RPSEditorPage() {
                     Back to RPS List
                 </button>
                 <h1 className="text-2xl font-bold text-gray-900">
-                    {rpsId ? 'Edit RPS' : 'Create New RPS'}
+                    {rpsId ? 'Edit RPS' : 'Buat RPS Baru'}
                 </h1>
-                {saving && <p className="text-sm text-gray-500 mt-1">Auto-saving...</p>}
+                {saving && <p className="text-sm text-gray-500 mt-1">Menyimpan otomatis...</p>}
             </div>
 
             {/* Section 1: Basic Information */}
             <div className="card p-6">
-                <h2 className="text-lg font-semibold mb-4">1. Basic Information</h2>
+                <h2 className="text-lg font-semibold mb-4">1. Informasi Dasar</h2>
 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-2">Course *</label>
+                        <label className="block text-sm font-medium mb-2">Mata Kuliah *</label>
                         <select
                             value={formData.mata_kuliah_id}
                             onChange={handleCourseChange}
                             className="w-full px-3 py-2 border rounded-lg"
                             required
                         >
-                            <option value="">Select Course...</option>
+                            <option value="">Pilih Mata Kuliah...</option>
                             {courses.map(course => (
                                 <option key={course.id} value={course.id}>
                                     {course.kode_mk} - {course.nama_mk}
@@ -400,7 +412,7 @@ export default function RPSEditorPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-2">Academic Year *</label>
+                            <label className="block text-sm font-medium mb-2">Tahun Akademik *</label>
                             <input
                                 type="text"
                                 value={formData.tahun_ajaran}
@@ -412,13 +424,13 @@ export default function RPSEditorPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium mb-2">Course Description</label>
+                        <label className="block text-sm font-medium mb-2">Deskripsi Mata Kuliah</label>
                         <textarea
                             value={formData.deskripsi_mk}
                             onChange={(e) => setFormData({ ...formData, deskripsi_mk: e.target.value })}
                             className="w-full px-3 py-2 border rounded-lg"
                             rows="4"
-                            placeholder="Enter course description..."
+                            placeholder="Masukkan deskripsi mata kuliah..."
                         ></textarea>
                     </div>
                 </div>
@@ -427,7 +439,7 @@ export default function RPSEditorPage() {
             {/* Section 2: CPL & CPMK Selection */}
             {formData.mata_kuliah_id && curriculumTree.length > 0 && (
                 <div className="card p-6">
-                    <h2 className="text-lg font-semibold mb-4">2. CPL & CPMK Mapping</h2>
+                    <h2 className="text-lg font-semibold mb-4">2. Pemetaan CPL & CPMK</h2>
 
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                         {curriculumTree.map(cpl => (
@@ -466,22 +478,22 @@ export default function RPSEditorPage() {
             {/* Section 3: Pertemuan Grid */}
             {selectedCPMKs.length > 0 && (
                 <div className="card p-6">
-                    <h2 className="text-lg font-semibold mb-4">3. Weekly Meeting Schedule</h2>
+                    <h2 className="text-lg font-semibold mb-4">3. Rencana Pembelajaran Mingguan</h2>
 
                     <div className="flex gap-3 mb-4">
                         <button onClick={handleBulkAdd14Rows} className="btn btn-secondary flex items-center gap-2">
                             <Plus className="w-5 h-5" />
-                            Add 14 Rows
+                            Tambah 14 Baris
                         </button>
 
                         <button onClick={handleAutoFillDates} className="btn btn-secondary flex items-center gap-2">
                             <Calendar className="w-5 h-5" />
-                            Auto-Fill Dates
+                            Isi Tanggal Otomatis
                         </button>
 
                         <button onClick={handleClearAll} className="btn btn-secondary text-red-600 flex items-center gap-2">
                             <Trash2 className="w-5 h-5" />
-                            Clear All
+                            Hapus Semua
                         </button>
                     </div>
 
@@ -496,7 +508,7 @@ export default function RPSEditorPage() {
                         />
                     ) : (
                         <div className="border-2 border-dashed rounded-lg p-12 text-center text-gray-500">
-                            No pertemuan data. Click "Add 14 Rows" to start.
+                            Belum ada data pertemuan. Klik "Tambah 14 Baris" untuk memulai.
                         </div>
                     )}
                 </div>
@@ -506,7 +518,7 @@ export default function RPSEditorPage() {
             <div className="card p-6 flex justify-between items-center">
                 <button onClick={handleSaveDraft} disabled={loading} className="btn btn-secondary flex items-center gap-2">
                     <Save className="w-5 h-5" />
-                    Save as Draft
+                    Simpan Draft
                 </button>
 
                 <button
@@ -515,7 +527,7 @@ export default function RPSEditorPage() {
                     className="btn btn-primary flex items-center gap-2"
                 >
                     <Send className="w-5 h-5" />
-                    Submit for Approval
+                    Submit untuk Approval
                 </button>
             </div>
         </div>

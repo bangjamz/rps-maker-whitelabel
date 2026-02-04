@@ -7,9 +7,20 @@ const MataKuliah = sequelize.define('MataKuliah', {
         primaryKey: true,
         autoIncrement: true
     },
+    scope: {
+        type: DataTypes.ENUM('institusi', 'fakultas', 'prodi'),
+        allowNull: false,
+        defaultValue: 'prodi'
+    },
+    fakultas_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'Required if scope is fakultas'
+    },
     prodi_id: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: true,
+        comment: 'Required if scope is prodi'
     },
     kode_mk: {
         type: DataTypes.STRING(20),
