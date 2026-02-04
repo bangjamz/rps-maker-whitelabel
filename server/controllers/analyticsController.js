@@ -159,7 +159,7 @@ export const getDashboardStats = async (req, res) => {
             const prodiId = user.kaprodi?.prodi_id;
 
             const totalStudents = await Mahasiswa.count({ where: { prodi_id: prodiId } });
-            const totalDosen = await Dosen.count({ where: { prodi_id: prodiId } });
+            const totalDosen = await User.count({ where: { prodi_id: prodiId, role: 'Dosen' } });
             const totalCourses = await MataKuliah.count({ where: { prodi_id: prodiId } });
             const activeRPS = await RPS.count({
                 where: { status: 'Approved' },
