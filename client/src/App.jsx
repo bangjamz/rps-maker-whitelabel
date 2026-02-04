@@ -8,6 +8,7 @@ import SettingsPage from './pages/SettingsPage';
 import CurriculumPage from './pages/CurriculumPage';
 import CoursesPage from './pages/CoursesPage';
 import RPSViewPage from './pages/RPSViewPage';
+import LecturerAssignmentPage from './pages/LecturerAssignmentPage';
 import { ROLES } from './utils/permissions';
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
                                     <Route path="dashboard" element={<KaprodiDashboard />} />
                                     <Route path="curriculum" element={<CurriculumPage />} />
                                     <Route path="courses" element={<CoursesPage />} />
+                                    <Route path="lecturer-assignments" element={<LecturerAssignmentPage />} />
                                     <Route path="rps/:courseId" element={<RPSViewPage />} />
                                     <Route path="rps" element={<div className="p-6"><h1 className="text-2xl font-bold">Kelola RPS (Coming Soon)</h1></div>} />
                                     <Route path="reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Page (Coming Soon)</h1></div>} />

@@ -1,9 +1,50 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { BookOpen, Clock, Users, GraduationCap, AlertCircle, TrendingUp, CheckCircle, FileText } from 'lucide-react';
+import axios from '../lib/axios';
+import useAuthStore from '../store/useAuthStore';
+
 export default function KaprodiDashboard() {
+    const { user } = useAuthStore();
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchStats();
+    }, []);
+
+    const fetchStats = async () => {
+        try {
+            const res = await axios.get('/api/dashboard/stats');
+            setStats(res.data.stats);
+        } catch (error) {
+            console.error('Failed to fetch stats:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-                Dashboard Kaprodi
-            </h1>
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Dashboard Kaprodi
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    {user?.prodi?.nama} • {user?.prodi?.fakultas?.nama}
+                </p>
+            </div>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -11,12 +52,12 @@ export default function KaprodiDashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Mata Kuliah</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">52</p>
+                            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                {stats?.mataKuliahCount || 0}
+                            </p>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
+                            <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                         </div>
                     </div>
                 </div>
@@ -25,12 +66,17 @@ export default function KaprodiDashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">RPS Pending Approval</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">8</p>
+                            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                {stats?.rpsStats?.pending || 0}
+                            </p>
+                            {stats?.rpsStats && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {stats.rpsStats.approved || 0} approved • {stats.rpsStats.total || 0} total
+                                </p>
+                            )}
                         </div>
                         <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                            <svg className="w-6 h-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <Clock className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                         </div>
                     </div>
                 </div>
@@ -39,12 +85,12 @@ export default function KaprodiDashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Dosen</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">2</p>
+                            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                {stats?.dosenCount || 0}
+                            </p>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
+                            <Users className="w-6 h-6 text-green-600 dark:text-green-400" />
                         </div>
                     </div>
                 </div>
@@ -53,16 +99,40 @@ export default function KaprodiDashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Mahasiswa</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white">30</p>
+                            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                                {stats?.mahasiswaCount || 0}
+                            </p>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                            <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
+                            <GraduationCap className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* RPS Completion Progress */}
+            {stats?.rpsStats && (
+                <div className="card p-6 mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            RPS Completion Progress
+                        </h2>
+                        <span className="text-2xl font-bold text-blue-600">
+                            {stats.rpsStats.completionRate}%
+                        </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                        <div
+                            className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+                            style={{ width: `${stats.rpsStats.completionRate}%` }}
+                        ></div>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                        <span>{stats.rpsStats.approved} approved of {stats.rpsStats.total} total</span>
+                        <span>{stats.rpsStats.pending} pending approval</span>
+                    </div>
+                </div>
+            )}
 
             {/* Quick Actions */}
             <div className="card p-6 mb-8">
@@ -70,53 +140,44 @@ export default function KaprodiDashboard() {
                     Aksi Cepat
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <button className="btn btn-primary justify-start">
+                    <Link to="/kaprodi/curriculum" className="btn btn-primary justify-start">
+                        <FileText className="w-5 h-5 mr-2" />
                         Kelola Data Kurikulum
-                    </button>
-                    <button className="btn btn-secondary justify-start">
+                    </Link>
+                    <Link to="/kaprodi/lecturer-assignments" className="btn btn-secondary justify-start">
+                        <Users className="w-5 h-5 mr-2" />
+                        Assign Dosen ke MK
+                    </Link>
+                    <Link to="/kaprodi/rps" className="btn btn-secondary justify-start">
+                        <CheckCircle className="w-5 h-5 mr-2" />
                         Review RPS Pending
-                    </button>
-                    <button className="btn btn-secondary justify-start">
-                        Lihat Laporan
-                    </button>
+                    </Link>
                 </div>
             </div>
 
-            {/* Recent Activity */}
-            <div className="card p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Aktivitas Terbaru
-                </h2>
-                <div className="space-y-4">
-                    <div className="flex items-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-800">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                        <div className="flex-1">
-                            <p className="text-sm text-gray-900 dark:text-white font-medium">
-                                RPS Algoritma Pemrograman telah disubmit
+            {/* Action Needed Alert */}
+            {stats?.rpsStats?.pending > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-8">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                        <div>
+                            <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+                                Action Needed
+                            </h3>
+                            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                You have {stats.rpsStats.pending} RPS document{stats.rpsStats.pending > 1 ? 's' : ''} pending approval.
+                                Please review them to ensure timely curriculum implementation.
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">2 jam yang lalu</p>
-                        </div>
-                    </div>
-                    <div className="flex items-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-800">
-                        <div className="w-2 h-2 rounded-full bg-green-500 mt-2"></div>
-                        <div className="flex-1">
-                            <p className="text-sm text-gray-900 dark:text-white font-medium">
-                                RPS Basis Data telah disetujui
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">5 jam yang lalu</p>
-                        </div>
-                    </div>
-                    <div className="flex items-start gap-4">
-                        <div className="w-2 h-2 rounded-full bg-purple-500 mt-2"></div>
-                        <div className="flex-1">
-                            <p className="text-sm text-gray-900 dark:text-white font-medium">
-                                Data CPL telah diperbarui
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">1 hari yang lalu</p>
+                            <Link
+                                to="/kaprodi/rps"
+                                className="text-sm font-medium text-amber-600 dark:text-amber-400 hover:underline mt-2 inline-block"
+                            >
+                                Review Now →
+                            </Link>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

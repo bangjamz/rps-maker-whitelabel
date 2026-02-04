@@ -1,0 +1,460 @@
+import { useState, useEffect } from 'react';
+import { Users, Plus, Search, Filter, X, Check, AlertCircle } from 'lucide-react';
+import axios from '../lib/axios';
+import useAuthStore from '../store/useAuthStore';
+
+export default function LecturerAssignmentPage() {
+    const { user } = useAuthStore();
+    const [assignments, setAssignments] = useState([]);
+    const [courses, setCourses] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedCourse, setSelectedCourse] = useState(null);
+    const [availableLecturers, setAvailableLecturers] = useState([]);
+    const [loadingLecturers, setLoadingLecturers] = useState(false);
+
+    // Form state
+    const [formData, setFormData] = useState({
+        dosen_id: '',
+        mata_kuliah_id: '',
+        semester: 'Ganjil',
+        tahun_ajaran: '2025/2026',
+        catatan: ''
+    });
+
+    // Filters
+    const [filters, setFilters] = useState({
+        semester: '',
+        tahunAjaran: '',
+        search: ''
+    });
+
+    useEffect(() => {
+        fetchAssignments();
+        fetchCourses();
+    }, []);
+
+    const fetchAssignments = async () => {
+        try {
+            setLoading(true);
+            const res = await axios.get('/api/lecturer-assignments', {
+                params: filters
+            });
+            setAssignments(res.data);
+        } catch (error) {
+            console.error('Failed to fetch assignments:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchCourses = async () => {
+        try {
+            const res = await axios.get('/api/courses');
+            setCourses(res.data);
+        } catch (error) {
+            console.error('Failed to fetch courses:', error);
+        }
+    };
+
+    const fetchAvailableLecturers = async (courseId) => {
+        try {
+            setLoadingLecturers(true);
+            // Get course details to find prodi_id
+            const course = courses.find(c => c.id === courseId);
+            if (!course) return;
+
+            const res = await axios.get('/api/lecturer-assignments/available-lecturers', {
+                params: { prodiId: course.prodi_id }
+            });
+            setAvailableLecturers(res.data.lecturers || []);
+        } catch (error) {
+            console.error('Failed to fetch available lecturers:', error);
+            setAvailableLecturers([]);
+        } finally {
+            setLoadingLecturers(false);
+        }
+    };
+
+    const handleOpenModal = (course) => {
+        setSelectedCourse(course);
+        setFormData({
+            ...formData,
+            mata_kuliah_id: course.id
+        });
+        fetchAvailableLecturers(course.id);
+        setShowModal(true);
+    };
+
+    const handleCloseModal = () => {
+        setShowModal(false);
+        setSelectedCourse(null);
+        setAvailableLecturers([]);
+        setFormData({
+            dosen_id: '',
+            mata_kuliah_id: '',
+            semester: 'Ganjil',
+            tahun_ajaran: '2025/2026',
+            catatan: ''
+        });
+    };
+
+    const handleCreateAssignment = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.post('/api/lecturer-assignments', formData);
+            fetchAssignments();
+            handleCloseModal();
+        } catch (error) {
+            console.error('Failed to create assignment:', error);
+            alert(error.response?.data?.message || 'Failed to create assignment');
+        }
+    };
+
+    const handleDeleteAssignment = async (id) => {
+        if (!confirm('Hapus assignment ini?')) return;
+
+        try {
+            await axios.delete(`/api/lecturer-assignments/${id}`);
+            fetchAssignments();
+        } catch (error) {
+            console.error('Failed to delete assignment:', error);
+            alert('Failed to delete assignment');
+        }
+    };
+
+    const getCategoryBadge = (category) => {
+        const styles = {
+            'same-prodi': 'bg-green-100 text-green-800 border-green-300',
+            'same-fakultas': 'bg-blue-100 text-blue-800 border-blue-300',
+            'cross-faculty': 'bg-purple-100 text-purple-800 border-purple-300'
+        };
+
+        const labels = {
+            'same-prodi': '✓ Same Prodi',
+            'same-fakultas': 'Same Fakultas',
+            'cross-faculty': 'Cross-Faculty'
+        };
+
+        return (
+            <span className={`px-2 py-0.5 text- rounded-full border ${styles[category]}`}>
+                {labels[category]}
+            </span>
+        );
+    };
+
+    const filteredAssignments = assignments.filter(a => {
+        if (filters.search) {
+            const search = filters.search.toLowerCase();
+            return (
+                a.dosen?.nama_lengkap.toLowerCase().includes(search) ||
+                a.mata_kuliah?.nama_mk.toLowerCase().includes(search)
+            );
+        }
+        return true;
+    });
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Lecturer Assignments</h1>
+                    <p className="text-gray-600 mt-1">
+                        Kelola penugasan dosen ke mata kuliah
+                    </p>
+                </div>
+                <button
+                    onClick={() => setShowModal(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                    <Plus className="w-5 h-5" />
+                    New Assignment
+                </button>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-lg shadow-sm p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search dosen or course..."
+                            value={filters.search}
+                            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                            className="pl-10 w-full border border-gray-300 rounded-lg px-4 py-2"
+                        />
+                    </div>
+                    <select
+                        value={filters.semester}
+                        onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
+                        className="border border-gray-300 rounded-lg px-4 py-2"
+                    >
+                        <option value="">All Semesters</option>
+                        <option value="Ganjil">Ganjil</option>
+                        <option value="Genap">Genap</option>
+                    </select>
+                    <select
+                        value={filters.tahunAjaran}
+                        onChange={(e) => setFilters({ ...filters, tahunAjaran: e.target.value })}
+                        className="border border-gray-300 rounded-lg px-4 py-2"
+                    >
+                        <option value="">All Years</option>
+                        <option value="2025/2026">2025/2026</option>
+                        <option value="2024/2025">2024/2025</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Assignments Table */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                        <tr>
+                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Dosen</th>
+                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Mata Kuliah</th>
+                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Semester</th>
+                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Home Base</th>
+                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Catatan</th>
+                            <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {loading ? (
+                            <tr>
+                                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                                    Loading...
+                                </td>
+                            </tr>
+                        ) : filteredAssignments.length === 0 ? (
+                            <tr>
+                                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                                    No assignments found
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredAssignments.map((assignment) => (
+                                <tr key={assignment.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                        <div>
+                                            <div className="font-medium text-gray-900">
+                                                {assignment.dosen?.nama_lengkap}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                                {assignment.dosen?.nidn}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div>
+                                            <div className="font-medium text-gray-900">
+                                                {assignment.mata_kuliah?.nama_mk}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                                {assignment.mata_kuliah?.kode_mk} • {assignment.mata_kuliah?.sks} SKS
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="text-sm">
+                                            <div className="font-medium">{assignment.semester}</div>
+                                            <div className="text-gray-500">{assignment.tahun_ajaran}</div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm">
+                                        {assignment.dosen?.prodi?.nama}
+                                        {assignment.dosen?.prodi?.fakultas && (
+                                            <div className="text-gray-500">
+                                                {assignment.dosen.prodi.fakultas.nama}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-600">
+                                        {assignment.catatan || '-'}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => handleDeleteAssignment(assignment.id)}
+                                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Create Assignment Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Assign Lecturer</h2>
+                            <button onClick={handleCloseModal} className="text-gray-500 hover:text-gray-700">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCreateAssignment} className="p-6 space-y-6">
+                            {/* Course Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Mata Kuliah *
+                                </label>
+                                <select
+                                    value={formData.mata_kuliah_id}
+                                    onChange={(e) => {
+                                        const courseId = parseInt(e.target.value);
+                                        setFormData({ ...formData, mata_kuliah_id: courseId });
+                                        if (courseId) {
+                                            const course = courses.find(c => c.id === courseId);
+                                            setSelectedCourse(course);
+                                            fetchAvailableLecturers(courseId);
+                                        }
+                                    }}
+                                    required
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                >
+                                    <option value="">Select Course</option>
+                                    {courses.map(course => (
+                                        <option key={course.id} value={course.id}>
+                                            {course.kode_mk} - {course.nama_mk} ({course.sks} SKS)
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Lecturer Selection with Categorization */}
+                            {formData.mata_kuliah_id && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Select Lecturer *
+                                        <span className="text-gray-500 font-normal ml-2">
+                                            (categorized by proximity)
+                                        </span>
+                                    </label>
+
+                                    {loadingLecturers ? (
+                                        <div className="text-center py-4 text-gray-500">Loading lecturers...</div>
+                                    ) : (
+                                        <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                                            {availableLecturers.map(lecturer => (
+                                                <label
+                                                    key={lecturer.id}
+                                                    className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition ${formData.dosen_id === lecturer.id
+                                                            ? 'border-blue-500 bg-blue-50'
+                                                            : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="dosen_id"
+                                                        value={lecturer.id}
+                                                        checked={formData.dosen_id === lecturer.id}
+                                                        onChange={(e) => setFormData({ ...formData, dosen_id: parseInt(e.target.value) })}
+                                                        className="mt-1 mr-3"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="font-medium text-gray-900">
+                                                                {lecturer.nama_lengkap}
+                                                            </span>
+                                                            {getCategoryBadge(lecturer.assignmentCategory)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600">
+                                                            {lecturer.nidn && `NIDN: ${lecturer.nidn} • `}
+                                                            {lecturer.prodi?.nama}
+                                                            {lecturer.prodi?.fakultas && (
+                                                                ` • ${lecturer.prodi.fakultas.nama}`
+                                                            )}
+                                                        </div>
+                                                        {!lecturer.isSameProdi && (
+                                                            <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                                                                <AlertCircle className="w-3 h-3" />
+                                                                {lecturer.isSameFakultas
+                                                                    ? 'Different prodi, same fakultas'
+                                                                    : 'Cross-faculty assignment'}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Semester & Year */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Semester *
+                                    </label>
+                                    <select
+                                        value={formData.semester}
+                                        onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                                        required
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                    >
+                                        <option value="Ganjil">Ganjil</option>
+                                        <option value="Genap">Genap</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Tahun Ajaran *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.tahun_ajaran}
+                                        onChange={(e) => setFormData({ ...formData, tahun_ajaran: e.target.value })}
+                                        placeholder="2025/2026"
+                                        required
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Catatan
+                                </label>
+                                <textarea
+                                    value={formData.catatan}
+                                    onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
+                                    placeholder="Optional notes..."
+                                    rows="3"
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <button
+                                    type="button"
+                                    onClick={handleCloseModal}
+                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!formData.mata_kuliah_id || !formData.dosen_id}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <Check className="w-5 h-5" />
+                                    Create Assignment
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
