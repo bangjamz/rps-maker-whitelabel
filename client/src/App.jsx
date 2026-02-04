@@ -14,6 +14,7 @@ import AssessmentSetupPage from './pages/AssessmentSetupPage';
 import GradeInputPage from './pages/GradeInputPage';
 import AttendanceMarkingPage from './pages/AttendanceMarkingPage';
 import EnrollmentManagementPage from './pages/EnrollmentManagementPage';
+import RPSEditorPage from './pages/RPSEditorPage';
 import { ROLES } from './utils/permissions';
 
 function App() {
@@ -44,6 +45,8 @@ function App() {
                                     <Route path="courses/:courseId/enrollment" element={<EnrollmentManagementPage />} />
                                     <Route path="rps/:courseId" element={<RPSViewPage />} />
                                     <Route path="rps" element={<RPSManagementPage />} />
+                                    <Route path="rps/create" element={<RPSEditorPage />} />
+                                    <Route path="rps/:rpsId/edit" element={<RPSEditorPage />} />
                                     <Route path="reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Page (Coming Soon)</h1></div>} />
                                 </Routes>
                             </DashboardLayout>
