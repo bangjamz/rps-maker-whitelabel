@@ -74,11 +74,13 @@
   - [ ] Backend APIs (enroll, unenroll, list)
   - [ ] Frontend: Enrollment management UI
   - [ ] Integration with grading & attendance
-- [ ] RPS Creation/Edit UI for Dosen
-  - [ ] Backend: RPS CRUD APIs for Dosen
-  - [ ] Excel-like editable grid interface
-  - [ ] Dropdown selectors with dependencies (CPL→CPMK→Sub-CPMK)
-  - [ ] Bulk create pertemuan
+- [x] RPS Creation/Edit UI for Dosen ✅ (2024-02-04)
+  - [x] Backend: RPS CRUD APIs for Dosen
+  - [x] Backend: getCurriculumTree for CPL→CPMK→SubCPMK
+  - [x] Backend: getRPSByCourse to check existing RPS
+  - [x] Excel-like editable grid interface
+  - [x] Dropdown selectors with dependencies (CPL→CPMK→Sub-CPMK)
+  - [x] Bulk create pertemuan
 - [ ] Dashboard Analytics Enhancement
   - [ ] Grade distribution charts
   - [ ] Attendance trends charts
@@ -88,6 +90,18 @@
   - [ ] Analytics dashboard with charts
   - [ ] Class-wide CPL reports
 
+## Phase 6.5: RPS Editor Redesign (2024-02-04) ✅
+- [x] Redesign RPS Editor to match official Mahardika template
+- [x] Section-based layout with 4 tabs:
+  - [x] Identitas MK (course info, semester filter, rumpun dropdown+add new)
+  - [x] CPL & CPMK (checkbox list CPL selection, inline CPMK/SubCPMK editors)
+  - [x] Rencana Mingguan (flexible week count, multi-select metode/penilaian)
+  - [x] Info Tambahan (pustaka, media, ambang batas kelulusan)
+- [x] Fix navigation: Edit RPS → proper edit vs create flow
+- [x] Fix backend getCurriculumTree (wrong column name kode→kode_cpl)
+- [x] Add /rps/by-course/:courseId endpoint to check existing RPS
+- [x] useAcademicStore integration for semester filtering
+
 ## Phase 7: Nice to Have (Priority 2)
 - [ ] PDF RPS Export with Templates
 - [ ] Email Notifications System
@@ -96,3 +110,11 @@
 ## Phase 8: Advanced Features (Priority 3)
 - [ ] QR Code Attendance
 - [ ] Mahasiswa Self-Service Portal
+
+## Known Issues & Fixes Log (2024-02-04)
+| Issue | Status | Solution |
+|-------|--------|----------|
+| getCurriculumTree 500 error | ✅ Fixed | Changed column 'kode' to 'kode_cpl', added required:false |
+| Edit RPS → "Buat RPS Baru" | ✅ Fixed | Added /rps/by-course endpoint, updated navigation logic |
+| Duplicate RPS error on save | ✅ Fixed | Check currentRPSId before create, use PUT for updates |
+

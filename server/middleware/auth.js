@@ -1,5 +1,5 @@
 import { verifyToken } from '../utils/jwt.js';
-import { User, Institusi, Fakultas, Prodi } from '../models/index.js';
+import { User, Institusi, Fakultas, Prodi, Dosen } from '../models/index.js';
 
 // ========== PERMISSION CONSTANTS ==========
 export const ROLES = {
@@ -37,7 +37,8 @@ export const authenticate = async (req, res, next) => {
             include: [
                 { model: Institusi, as: 'institusi', attributes: ['id', 'nama'] },
                 { model: Fakultas, as: 'fakultas', attributes: ['id', 'kode', 'nama'] },
-                { model: Prodi, as: 'prodi', attributes: ['id', 'kode', 'nama', 'jenjang', 'fakultas_id'] }
+                { model: Prodi, as: 'prodi', attributes: ['id', 'kode', 'nama', 'jenjang', 'fakultas_id'] },
+                { model: Dosen, as: 'dosen', attributes: ['id', 'nama_lengkap', 'nidn', 'prodi_id'] }
             ]
         });
 

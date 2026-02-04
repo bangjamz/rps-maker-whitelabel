@@ -55,6 +55,9 @@ export default function DosenCoursesPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {assignments.map((assignment) => {
+                        // Skip if mata_kuliah is missing (deleted or integrity issue)
+                        if (!assignment.mata_kuliah) return null;
+
                         const rps = getRpsForCourse(
                             assignment.mata_kuliah.id,
                             assignment.semester,
@@ -66,14 +69,14 @@ export default function DosenCoursesPage() {
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <span className="inline-block px-2.5 py-1 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs font-semibold rounded-md mb-2">
-                                            {assignment.mata_kuliah?.kode_mk}
+                                            {assignment.mata_kuliah.kode_mk}
                                         </span>
                                         <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight">
-                                            {assignment.mata_kuliah?.nama_mk}
+                                            {assignment.mata_kuliah.nama_mk}
                                         </h3>
                                     </div>
                                     <span className="flex-shrink-0 text-xs font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                                        {assignment.mata_kuliah?.sks} SKS
+                                        {assignment.mata_kuliah.sks} SKS
                                     </span>
                                 </div>
 
@@ -126,7 +129,7 @@ export default function DosenCoursesPage() {
                                         {rps ? 'Edit RPS' : 'Buat RPS'}
                                     </button>
                                     <button
-                                        onClick={() => navigate(`/dosen/courses/${assignment.mata_kuliah?.id}/grades`)}
+                                        onClick={() => navigate(`/dosen/courses/${assignment.mata_kuliah.id}/grades`)}
                                         className="btn btn-outline btn-sm flex items-center justify-center gap-2"
                                     >
                                         <GraduationCap size={16} />

@@ -21,22 +21,37 @@ export const getCurriculumTree = async (req, res) => {
             include: [
                 {
                     model: CPMK,
-                    as: 'cpmks',
+                    as: 'cpmk',
+                    required: false,  // LEFT JOIN - don't fail if no CPMK
                     include: [
                         {
                             model: SubCPMK,
-                            as: 'subCPMKs'
+                            as: 'sub_cpmk',
+                            required: false  // LEFT JOIN - don't fail if no SubCPMK
                         }
                     ]
                 }
             ],
-            order: [['kode', 'ASC']]
+            order: [['kode_cpl', 'ASC']]  // Fixed: use kode_cpl not kode
         });
 
-        res.json({ cpls });
+        // Flatten to match frontend expected format
+        const formattedCpls = cpls.map(cpl => ({
+            id: cpl.id,
+            kode: cpl.kode_cpl,  // Use actual column name
+            deskripsi: cpl.deskripsi,
+            cpmks: (cpl.cpmk || []).map(cpmk => ({
+                id: cpmk.id,
+                kode: cpmk.kode_cpmk,  // Use actual column name
+                deskripsi: cpmk.deskripsi,
+                subCpmks: cpmk.sub_cpmk || []
+            }))
+        }));
+
+        res.json({ cpls: formattedCpls });
     } catch (error) {
         console.error('Error fetching curriculum tree:', error);
-        res.status(500).json({ message: 'Failed to fetch curriculum tree' });
+        res.status(500).json({ message: 'Failed to fetch curriculum tree', error: error.message });
     }
 };
 
@@ -81,8 +96,8 @@ export const createRPS = async (req, res) => {
             semester,
             tahun_ajaran,
             deskripsi_mk,
-            dosen_pengampu_id: req.user.dosen?.id || null,
-            status: 'Draft'
+            dosen_id: req.user.dosen?.id || null,
+            status: 'draft'
         });
 
         // TODO: Link CPLs and CPMKs (if using junction table)
@@ -111,13 +126,17 @@ export const updateRPS = async (req, res) => {
             return res.status(404).json({ message: 'RPS not found' });
         }
 
-        // Check if Dosen owns this RPS
-        if (rps.dosen_pengampu_id !== req.user.dosen?.id) {
-            return res.status(403).json({ message: 'You can only edit your own RPS' });
+        // Check if Dosen owns this RPS, OR if user is Kaprodi/Dekan
+        // Allow if user is DOSEN and owns it, OR if user is KAPRODI (admin control)
+        const isOwner = rps.dosen_id === req.user.dosen?.id;
+        const canEdit = isOwner || ['kaprodi', 'dekan'].includes(req.user.role);
+
+        if (!canEdit) {
+            return res.status(403).json({ message: 'You do not have permission to edit this RPS' });
         }
 
         // Can only edit if Draft
-        if (rps.status !== 'Draft') {
+        if (rps.status.toLowerCase() !== 'draft') {
             return res.status(400).json({
                 message: 'Can only edit RPS in Draft status'
             });
@@ -152,13 +171,16 @@ export const bulkUpsertPertemuan = async (req, res) => {
             return res.status(404).json({ message: 'RPS not found' });
         }
 
-        // Check ownership
-        if (rps.dosen_pengampu_id !== req.user.dosen?.id) {
-            return res.status(403).json({ message: 'You can only edit your own RPS' });
+        // Check ownership or permission
+        const isOwner = rps.dosen_id === req.user.id;
+        const canEdit = isOwner || ['kaprodi', 'dekan', 'admin'].includes(req.user.role);
+
+        if (!canEdit) {
+            return res.status(403).json({ message: 'You do not have permission to edit this RPS' });
         }
 
         // Can only edit if Draft
-        if (rps.status !== 'Draft') {
+        if (rps.status && rps.status.toLowerCase() !== 'draft') {
             return res.status(400).json({
                 message: 'Can only edit RPS in Draft status'
             });
@@ -168,39 +190,45 @@ export const bulkUpsertPertemuan = async (req, res) => {
 
         for (const item of pertemuan) {
             const {
-                pertemuan_ke,
-                tanggal,
-                topik,
-                sub_cpmk_id,
-                metode_pembelajaran,
+                minggu_ke,
+                sub_cpmk,
+                indikator,
                 materi,
-                bentuk_evaluasi
+                metode_pembelajaran,
+                bentuk_pembelajaran,
+                link_daring,
+                bentuk_evaluasi,
+                bobot_penilaian
             } = item;
 
             const [pertemuanRecord, created] = await RPSPertemuan.findOrCreate({
                 where: {
                     rps_id: rpsId,
-                    pertemuan_ke
+                    minggu_ke: minggu_ke
                 },
                 defaults: {
-                    tanggal,
-                    topik,
-                    sub_cpmk_id,
-                    metode_pembelajaran,
+                    sub_cpmk,
+                    indikator,
                     materi,
-                    bentuk_evaluasi
+                    metode_pembelajaran,
+                    bentuk_pembelajaran: Array.isArray(bentuk_pembelajaran) ? bentuk_pembelajaran : [],
+                    link_daring,
+                    bentuk_evaluasi,
+                    bobot_penilaian
                 }
             });
 
             if (!created) {
                 // Update existing
                 await pertemuanRecord.update({
-                    tanggal,
-                    topik,
-                    sub_cpmk_id,
-                    metode_pembelajaran,
+                    sub_cpmk,
+                    indikator,
                     materi,
-                    bentuk_evaluasi
+                    metode_pembelajaran,
+                    bentuk_pembelajaran: Array.isArray(bentuk_pembelajaran) ? bentuk_pembelajaran : [],
+                    link_daring,
+                    bentuk_evaluasi,
+                    bobot_penilaian
                 });
             }
 
@@ -213,25 +241,26 @@ export const bulkUpsertPertemuan = async (req, res) => {
         });
     } catch (error) {
         console.error('Error bulk upserting pertemuan:', error);
-        res.status(500).json({ message: 'Failed to save pertemuan' });
+        res.status(500).json({ message: 'Failed to save pertemuan', error: error.message });
     }
 };
 
 /**
- * Get Dosen's courses (for RPS creation dropdown)
+ * Get courses for RPS creation dropdown
+ * - Dosen: Get courses in their prodi
+ * - Kaprodi: Get all courses in their prodi
  */
 export const getDosenCourses = async (req, res) => {
     try {
-        const dosenId = req.user.dosen?.id;
-        if (!dosenId) {
-            return res.status(404).json({ message: 'Dosen profile not found' });
-        }
-
-        // Get all courses in Dosen's prodi
         const user = await User.findByPk(req.user.id, {
             include: [{ model: Prodi, as: 'prodi' }]
         });
 
+        if (!user.prodi_id) {
+            return res.status(404).json({ message: 'User has no prodi assigned' });
+        }
+
+        // Get all courses in user's prodi
         const courses = await MataKuliah.findAll({
             where: { prodi_id: user.prodi_id },
             order: [['kode_mk', 'ASC']]
@@ -239,7 +268,7 @@ export const getDosenCourses = async (req, res) => {
 
         res.json(courses);
     } catch (error) {
-        console.error('Error fetching dosen courses:', error);
+        console.error('Error fetching courses:', error);
         res.status(500).json({ message: 'Failed to fetch courses' });
     }
 };

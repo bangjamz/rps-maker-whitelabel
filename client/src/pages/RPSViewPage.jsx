@@ -8,6 +8,7 @@ export default function RPSViewPage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [rpsData, setRpsData] = useState(null);
+    const [existingRPS, setExistingRPS] = useState(null);  // Store existing RPS if found
     const [course, setCourse] = useState(null);
     const [editMode, setEditMode] = useState(false);
 
@@ -18,16 +19,32 @@ export default function RPSViewPage() {
     const loadRPSData = async () => {
         setLoading(true);
         try {
+            // Fetch course info
             const courseResponse = await axios.get(`/courses/${courseId}`);
             setCourse(courseResponse.data);
 
+            // Try to fetch existing RPS for this course
+            try {
+                const rpsResponse = await axios.get(`/rps/by-course/${courseId}`);
+                if (rpsResponse.data && rpsResponse.data.id) {
+                    setExistingRPS(rpsResponse.data);
+                    setRpsData(rpsResponse.data);
+                }
+            } catch (rpsError) {
+                // No RPS exists for this course yet - that's OK
+                console.log('No existing RPS for this course');
+            }
+
+            // Also fetch CPL/CPMK for display
             const cplResponse = await axios.get('/curriculum/cpl');
             const cpmkResponse = await axios.get('/curriculum/cpmk');
 
-            setRpsData({
-                cpl: cplResponse.data.slice(0, 3),
-                cpmk: cpmkResponse.data.slice(0, 5),
-            });
+            if (!existingRPS) {
+                setRpsData({
+                    cpl: cplResponse.data.slice(0, 3),
+                    cpmk: cpmkResponse.data.slice(0, 5),
+                });
+            }
         } catch (error) {
             console.error('Failed to load RPS:', error);
         } finally {
@@ -45,8 +62,23 @@ export default function RPSViewPage() {
     };
 
     const handleEditRPS = () => {
-        setEditMode(true);
-        alert('Mode edit RPS akan segera tersedia. Fitur dalam pengembangan.');
+        const basePath = window.location.pathname.includes('/kaprodi/') ? '/kaprodi' : '/dosen';
+
+        // If RPS exists, navigate to edit; otherwise navigate to create
+        if (existingRPS && existingRPS.id) {
+            navigate(`${basePath}/rps/${existingRPS.id}/edit`);
+        } else {
+            navigate(`${basePath}/rps/create`, {
+                state: {
+                    courseId: course?.id,
+                    kode_mk: course?.kode_mk,
+                    nama_mk: course?.nama_mk,
+                    sks: course?.sks,
+                    prodi_id: course?.prodi_id,
+                    semester: course?.semester
+                }
+            });
+        }
     };
 
     if (loading) {

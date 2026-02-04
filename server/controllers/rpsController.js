@@ -82,6 +82,50 @@ export const getAllRPS = async (req, res) => {
 };
 
 /**
+ * Get RPS by Course ID
+ * GET /api/rps/by-course/:courseId
+ * Returns the latest RPS for a given course (if exists)
+ */
+export const getRPSByCourse = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+
+        // Find the most recent RPS for this course
+        const rps = await RPS.findOne({
+            where: { mata_kuliah_id: courseId },
+            include: [
+                {
+                    model: MataKuliah,
+                    as: 'mata_kuliah',
+                    attributes: ['id', 'kode_mk', 'nama_mk', 'sks']
+                },
+                {
+                    model: User,
+                    as: 'dosen',
+                    attributes: ['id', 'nama_lengkap']
+                },
+                {
+                    model: RPSPertemuan,
+                    as: 'pertemuan',
+                    separate: true,
+                    order: [['minggu_ke', 'ASC']]
+                }
+            ],
+            order: [['created_at', 'DESC']]  // Get the most recent one
+        });
+
+        if (!rps) {
+            return res.status(404).json({ message: 'No RPS found for this course' });
+        }
+
+        res.json(rps);
+    } catch (error) {
+        console.error('Get RPS by course error:', error);
+        res.status(500).json({ message: 'Failed to retrieve RPS for course' });
+    }
+};
+
+/**
  * Get RPS by ID with full details
  * GET /api/rps/:id
  */

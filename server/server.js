@@ -19,7 +19,7 @@ import cplAnalyticsRoutes from './routes/cplAnalytics.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors({
@@ -75,7 +75,7 @@ const startServer = async () => {
 
         // Sync models (without force in production)
         if (process.env.NODE_ENV !== 'production') {
-            await sequelize.sync({ alter: false });
+            await sequelize.sync({ alter: true }); // Enabled alter to sync new columns
             console.log('✅ Database models synchronized');
         }
 

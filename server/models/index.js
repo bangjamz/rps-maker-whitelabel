@@ -16,6 +16,7 @@ import RPSPertemuan from './RPSPertemuan.js';
 import PertemuanCPMK from './PertemuanCPMK.js';
 import PenilaianMK from './PenilaianMK.js';
 import NilaiMahasiswa from './NilaiMahasiswa.js';
+import Dosen from './Dosen.js';
 import DosenAssignment from './DosenAssignment.js';
 import GradingSystem from './GradingSystem.js';
 import GradeScale from './GradeScale.js';
@@ -57,6 +58,12 @@ User.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
 // User → Prodi (for kaprodi, dosen, mahasiswa)
 Prodi.hasMany(User, { foreignKey: 'prodi_id', as: 'users' });
 User.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+
+// User → Dosen Profile
+User.hasOne(Dosen, { foreignKey: 'user_id', as: 'dosen' });
+Dosen.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+Dosen.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(Dosen, { foreignKey: 'prodi_id', as: 'dosen_list' });
 
 // ========== CPL MULTI-LEVEL HIERARCHY ==========
 // Institusi → CPL relationship (institut-level CPLs)
@@ -278,6 +285,7 @@ export {
     PenilaianMK,
     NilaiMahasiswa,
     DosenAssignment,
+    Dosen,
     GradingSystem,
     GradeScale,
     GradeScaleDetail,

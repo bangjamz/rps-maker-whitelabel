@@ -1,7 +1,140 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../lib/axios';
-import { LayoutGrid, List, Table as TableIcon, Edit, Trash2, Plus, Search, BookOpen, Clock, Calendar } from 'lucide-react';
+import useAcademicStore from '../store/useAcademicStore';
+import { LayoutGrid, List, Table as TableIcon, Edit, Trash2, Plus, Search, BookOpen, Clock, Calendar, UserPlus, X, Check, AlertCircle } from 'lucide-react';
+
+// --- Sub-components ---
+
+const AssignLecturerModal = ({ course, isOpen, onClose, onSave }) => {
+    const [lecturers, setLecturers] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        dosen_id: '',
+        semester: 'Ganjil',
+        tahun_ajaran: '2025/2026',
+        catatan: ''
+    });
+
+    useEffect(() => {
+        if (course && isOpen) {
+            fetchLecturers();
+            setFormData(prev => ({
+                ...prev,
+                semester: course.semester % 2 !== 0 ? 'Ganjil' : 'Genap'
+            }));
+        }
+    }, [course, isOpen]);
+
+    const fetchLecturers = async () => {
+        if (!course) return;
+        setLoading(true);
+        try {
+            const res = await axios.get('/lecturer-assignments/available-lecturers', {
+                params: { prodiId: course.prodi_id }
+            });
+            setLecturers(res.data.lecturers || []);
+        } catch (error) {
+            console.error('Failed to fetch lecturers:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(course.id, formData);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Penugasan Dosen</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mata Kuliah</label>
+                        <input
+                            type="text"
+                            value={`${course?.kode_mk} - ${course?.nama_mk}`}
+                            disabled
+                            className="input bg-gray-100 dark:bg-gray-700"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pilih Dosen</label>
+                        {loading ? (
+                            <div className="text-sm text-gray-500">Memuat data dosen...</div>
+                        ) : (
+                            <select
+                                required
+                                value={formData.dosen_id}
+                                onChange={(e) => setFormData({ ...formData, dosen_id: e.target.value })}
+                                className="input"
+                            >
+                                <option value="">Pilih Dosen...</option>
+                                {lecturers.map(dosen => (
+                                    <option key={dosen.id} value={dosen.id}>
+                                        {dosen.nama_lengkap}
+                                        {dosen.assignmentCategory === 'same-prodi' ? ' (Prodi Sama)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semester</label>
+                            <select
+                                value={formData.semester}
+                                onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                                className="input"
+                            >
+                                <option value="Ganjil">Ganjil</option>
+                                <option value="Genap">Genap</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tahun Ajaran</label>
+                            <input
+                                type="text"
+                                required
+                                value={formData.tahun_ajaran}
+                                onChange={(e) => setFormData({ ...formData, tahun_ajaran: e.target.value })}
+                                className="input"
+                                placeholder="2025/2026"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Catatan</label>
+                        <textarea
+                            value={formData.catatan}
+                            onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
+                            className="input"
+                            rows="2"
+                        ></textarea>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <button type="button" onClick={onClose} className="btn btn-ghost">Batal</button>
+                        <button type="submit" className="btn btn-primary">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
 
 const EditCourseModal = ({ course, isOpen, onClose, onSave }) => {
     const [formData, setFormData] = useState({
@@ -95,13 +228,43 @@ const EditCourseModal = ({ course, isOpen, onClose, onSave }) => {
     );
 };
 
+const ViewToggle = ({ viewMode, setViewMode }) => (
+    <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1">
+        <button
+            onClick={() => setViewMode('grid')}
+            className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+            title="Tampilan Grid"
+        >
+            <LayoutGrid size={18} />
+        </button>
+        <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+            title="Tampilan List"
+        >
+            <List size={18} />
+        </button>
+        <button
+            onClick={() => setViewMode('table')}
+            className={`p-2 rounded-md ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+            title="Tampilan Tabel"
+        >
+            <TableIcon size={18} />
+        </button>
+    </div>
+);
+
+// --- Main Component ---
+
 export default function CoursesPage() {
     const navigate = useNavigate();
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [filter, setFilter] = useState({ semester: 'all', search: '' });
+    const { activeSemester, activeYear } = useAcademicStore();
+    const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState('grid'); // grid, list, table
     const [editingCourse, setEditingCourse] = useState(null);
+    const [assigningCourse, setAssigningCourse] = useState(null);
 
     useEffect(() => {
         loadCourses();
@@ -111,11 +274,26 @@ export default function CoursesPage() {
         setLoading(true);
         try {
             const response = await axios.get('/courses');
+            console.log('DEBUG: Courses fetched:', response.data);
             setCourses(response.data);
         } catch (error) {
             console.error('Failed to load courses:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAssignLecturer = async (courseId, assignmentData) => {
+        try {
+            await axios.post('/lecturer-assignments', {
+                ...assignmentData,
+                mata_kuliah_id: courseId
+            });
+            alert('Dosen berhasil di-assign!');
+            setAssigningCourse(null);
+        } catch (error) {
+            console.error('Failed to assign lecturer:', error);
+            alert('Gagal assign dosen: ' + (error.response?.data?.message || 'Error occurred'));
         }
     };
 
@@ -131,42 +309,17 @@ export default function CoursesPage() {
     };
 
     const filteredCourses = courses.filter(course => {
-        const matchSemester = filter.semester === 'all' || course.semester === parseInt(filter.semester);
-        const matchSearch = course.nama_mk.toLowerCase().includes(filter.search.toLowerCase()) ||
-            course.kode_mk.toLowerCase().includes(filter.search.toLowerCase());
+        // Filter by semester from store (Ganjil/Genap)
+        // Mapped: 1,3,5,7 -> Ganjil; 2,4,6,8 -> Genap
+        const isGanjil = course.semester % 2 !== 0;
+        const courseSemesterType = isGanjil ? 'Ganjil' : 'Genap';
+
+        const matchSemester = activeSemester === courseSemesterType;
+        const matchSearch = course.nama_mk.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            course.kode_mk.toLowerCase().includes(searchQuery.toLowerCase());
+
         return matchSemester && matchSearch;
     });
-
-    const semesterOptions = [
-        { value: 'all', label: 'Semua Semester' },
-        ...Array.from({ length: 8 }, (_, i) => ({ value: (i + 1).toString(), label: `Semester ${i + 1}` }))
-    ];
-
-    const ViewToggle = () => (
-        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1">
-            <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                title="Grid View"
-            >
-                <LayoutGrid size={18} />
-            </button>
-            <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                title="List View"
-            >
-                <List size={18} />
-            </button>
-            <button
-                onClick={() => setViewMode('table')}
-                className={`p-2 rounded-md ${viewMode === 'table' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                title="Table View"
-            >
-                <TableIcon size={18} />
-            </button>
-        </div>
-    );
 
     return (
         <div className="p-6">
@@ -178,7 +331,7 @@ export default function CoursesPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <ViewToggle />
+                    <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
                     <button className="btn btn-primary flex items-center gap-2">
                         <Plus size={18} />
                         <span>Tambah MK</span>
@@ -194,28 +347,20 @@ export default function CoursesPage() {
                         <input
                             type="text"
                             placeholder="Cari berdasarkan kode atau nama..."
-                            value={filter.search}
-                            onChange={(e) => setFilter({ ...filter, search: e.target.value })}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             className="input pl-10"
                         />
                     </div>
-                    <div>
-                        <select
-                            value={filter.semester}
-                            onChange={(e) => setFilter({ ...filter, semester: e.target.value })}
-                            className="input"
-                        >
-                            {semesterOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
+                </div>
+                <div className="mt-2 text-sm text-gray-500">
+                    Menampilkan mata kuliah Semester {activeSemester} (Tahun Ajaran {activeYear})
                 </div>
             </div>
 
             {/* Content Display */}
             {loading ? (
-                <div className="text-center py-12 text-gray-500">Loading...</div>
+                <div className="text-center py-12 text-gray-500">Memuat...</div>
             ) : filteredCourses.length === 0 ? (
                 <div className="card p-12 text-center">
                     <p className="text-gray-500 dark:text-gray-400">Tidak ada mata kuliah yang ditemukan</p>
@@ -267,14 +412,14 @@ export default function CoursesPage() {
                                         <button
                                             onClick={() => setAssigningCourse(course)}
                                             className="btn btn-ghost btn-sm px-2 text-green-600"
-                                            title="Assign Dosen"
+                                            title="Tugaskan Dosen"
                                         >
                                             <UserPlus size={16} />
                                         </button>
                                         <button
                                             onClick={() => setEditingCourse(course)}
                                             className="btn btn-ghost btn-sm px-2"
-                                            title="Edit"
+                                            title="Ubah"
                                         >
                                             <Edit size={16} />
                                         </button>
@@ -322,13 +467,14 @@ export default function CoursesPage() {
                                         <button
                                             onClick={() => setAssigningCourse(course)}
                                             className="btn btn-ghost btn-sm text-green-600"
-                                            title="Assign Dosen"
+                                            title="Tugaskan Dosen"
                                         >
                                             <UserPlus size={16} />
                                         </button>
                                         <button
                                             onClick={() => setEditingCourse(course)}
                                             className="btn btn-ghost btn-sm"
+                                            title="Ubah"
                                         >
                                             <Edit size={16} />
                                         </button>
@@ -348,7 +494,7 @@ export default function CoursesPage() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mata Kuliah</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SKS</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Semester</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Scope</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Lingkup</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Aksi</th>
                                     </tr>
                                 </thead>
@@ -382,15 +528,15 @@ export default function CoursesPage() {
                                                 <button
                                                     onClick={() => setAssigningCourse(course)}
                                                     className="text-green-600 hover:text-green-900 dark:hover:text-green-400 mr-4"
-                                                    title="Assign Dosen"
+                                                    title="Tugaskan Dosen"
                                                 >
-                                                    Assign
+                                                    Tugaskan
                                                 </button>
                                                 <button
                                                     onClick={() => setEditingCourse(course)}
                                                     className="text-amber-600 hover:text-amber-900 dark:hover:text-amber-400"
                                                 >
-                                                    Edit
+                                                    Ubah
                                                 </button>
                                             </td>
                                         </tr>

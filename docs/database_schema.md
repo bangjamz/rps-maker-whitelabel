@@ -227,24 +227,31 @@ Course learning plan.
 ---
 
 #### `rps_pertemuan`
-Weekly meeting plans in RPS.
+Weekly meeting plans in RPS. *(Updated 2026-02-04 with additional OBE fields)*
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | INTEGER | PK, AUTO_INCREMENT | Meeting ID |
 | rps_id | INTEGER | FK → rps(id), NOT NULL | Parent RPS |
-| pertemuan_ke | INTEGER | NOT NULL | Week number (1-14+) |
+| minggu_ke | INTEGER | NOT NULL | Week number (1-15+) |
 | tanggal | DATE | | Scheduled date |
-| topik | TEXT | | Topic/title |
+| cpmk_id | INTEGER | FK → cpmk(id) | Target CPMK |
 | sub_cpmk_id | INTEGER | FK → sub_cpmk(id) | Target Sub-CPMK |
-| metode_pembelajaran | TEXT | | Teaching method |
-| materi | TEXT | | Materials |
-| bentuk_evaluasi | TEXT | | Assessment form |
+| indikator | TEXT | | Indikator Ketercapaian |
+| teknik_penilaian | JSON | | Array of assessment techniques |
+| kriteria_penilaian | TEXT | | Kriteria Penilaian |
+| materi | TEXT | | Materials/topics |
+| metode_pembelajaran | JSON | | Array of teaching methods (max 3) |
+| bentuk_pembelajaran | JSON | | Array: ['luring', 'daring'] |
+| link_daring | TEXT | | Online session link (if daring) |
+| bobot_penilaian | DECIMAL(5,2) | | Weight % for this meeting |
+| topik | TEXT | | Topic/title (deprecated, use materi) |
+| bentuk_evaluasi | TEXT | | Assessment form (deprecated) |
 | created_at | TIMESTAMP | | |
 | updated_at | TIMESTAMP | | |
 
-**Unique:** `(rps_id, pertemuan_ke)`  
-**Indexes:** `rps_id`, `sub_cpmk_id`
+**Unique:** `(rps_id, minggu_ke)`  
+**Indexes:** `rps_id`, `sub_cpmk_id`, `cpmk_id`
 
 ---
 

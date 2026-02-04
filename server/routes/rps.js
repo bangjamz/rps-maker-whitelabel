@@ -3,6 +3,7 @@ import { authenticate, authorize, ROLES } from '../middleware/auth.js';
 import {
     getAllRPS,
     getRPSById,
+    getRPSByCourse,
     createRPS,
     updateRPS as updateRPSController,
     submitRPS,
@@ -25,14 +26,17 @@ router.use(authenticate);
 
 // ========== DOSEN RPS CREATION & EDITING ==========
 router.get('/curriculum/tree/:prodiId', getCurriculumTree);
-router.get('/dosen/my-courses', authorize(ROLES.DOSEN), getDosenCourses);
-router.post('/dosen/create', authorize(ROLES.DOSEN), createRPSDosen);
-router.put('/dosen/:rpsId/update', authorize(ROLES.DOSEN), updateRPSDosen);
-router.post('/dosen/:rpsId/pertemuan/bulk', authorize(ROLES.DOSEN), bulkUpsertPertemuan);
+router.get('/dosen/my-courses', authorize(ROLES.DOSEN, ROLES.KAPRODI), getDosenCourses);
+router.post('/dosen/create', authorize(ROLES.DOSEN, ROLES.KAPRODI), createRPSDosen);
+router.put('/dosen/:rpsId/update', authorize(ROLES.DOSEN, ROLES.KAPRODI, ROLES.DEKAN), updateRPSDosen);
+router.post('/dosen/:rpsId/pertemuan/bulk', authorize(ROLES.DOSEN, ROLES.KAPRODI, ROLES.DEKAN), bulkUpsertPertemuan);
 
 // ========== GENERAL RPS ROUTES ==========
 // Get all RPS (role-filtered)
 router.get('/', getAllRPS);
+
+// Get RPS by Course ID (for checking if RPS exists)
+router.get('/by-course/:courseId', getRPSByCourse);
 
 // Get RPS by ID
 router.get('/:id', getRPSById);

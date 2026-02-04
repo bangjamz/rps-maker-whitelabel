@@ -35,8 +35,14 @@ const RPSPertemuan = sequelize.define('RPSPertemuan', {
         comment: 'Diskusi, presentasi, praktikum, dll'
     },
     bentuk_pembelajaran: {
-        type: DataTypes.ENUM('tatap_muka', 'daring_sinkronus', 'daring_asinkronus', 'hybrid'),
-        defaultValue: 'tatap_muka'
+        type: DataTypes.JSON, // Changed to JSON to store array ['tatap_muka', 'daring']
+        defaultValue: [],
+        comment: 'Array of selected methods: tatap_muka, daring, etc.'
+    },
+    link_daring: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Link Zoom/GMeet if daring is selected'
     },
     jenis_pertemuan: {
         type: DataTypes.ENUM('regular', 'uts', 'uas', 'praktikum', 'seminar'),
@@ -45,6 +51,11 @@ const RPSPertemuan = sequelize.define('RPSPertemuan', {
     penugasan: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    bentuk_evaluasi: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Jenis evaluasi: Tes Tertulis, Kuis, Proyek, dll'
     },
     bobot_penilaian: {
         type: DataTypes.INTEGER,

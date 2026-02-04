@@ -1,13 +1,16 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
 import useThemeStore from '../store/useThemeStore';
+import useAcademicStore from '../store/useAcademicStore';
 import { isAdmin, isDosen } from '../utils/permissions';
+import { Calendar } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuthStore();
     const { theme, toggleTheme } = useThemeStore();
+    const { activeSemester, activeYear, setSemester, setYear } = useAcademicStore();
 
     const handleLogout = () => {
         logout();
@@ -15,10 +18,11 @@ export default function DashboardLayout({ children }) {
     };
 
     // Navigation items based on role
-    const navItems = isAdmin() ? [
+    const navItems = user?.role === 'kaprodi' ? [
         { path: '/kaprodi/dashboard', label: 'Dashboard' },
         { path: '/kaprodi/curriculum', label: 'Data Kurikulum' },
         { path: '/kaprodi/courses', label: 'Mata Kuliah' },
+        { path: '/kaprodi/lecturer-assignments', label: 'Penugasan Dosen' }, // Moved up
         { path: '/kaprodi/rps', label: 'Kelola RPS' },
         { path: '/kaprodi/reports', label: 'Laporan' },
     ] : isDosen() ? [
@@ -83,6 +87,7 @@ export default function DashboardLayout({ children }) {
                 {/* Top Bar */}
                 <header className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                     <div className="flex items-center justify-between px-6 py-4">
+                        {/* Left: User Info */}
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 Selamat datang, {user?.nama_lengkap}
@@ -92,7 +97,35 @@ export default function DashboardLayout({ children }) {
                             </p>
                         </div>
 
+                        {/* Right: Semester Selector, Theme Toggle, Logout */}
                         <div className="flex items-center gap-3">
+                            {/* Semester Selector (Kaprodi Only) */}
+                            {user?.role === 'kaprodi' && (
+                                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <Calendar className="w-4 h-4 text-gray-500" />
+                                    <select
+                                        value={activeSemester}
+                                        onChange={(e) => setSemester(e.target.value)}
+                                        className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer text-gray-700 dark:text-gray-300 pr-8"
+                                    >
+                                        <option value="Ganjil">Sem. Ganjil</option>
+                                        <option value="Genap">Sem. Genap</option>
+                                    </select>
+                                    <span className="text-gray-300">|</span>
+                                    <select
+                                        value={activeYear}
+                                        onChange={(e) => setYear(e.target.value)}
+                                        className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer text-gray-700 dark:text-gray-300 pr-8"
+                                    >
+                                        {Array.from({ length: 5 }, (_, i) => {
+                                            const startYear = new Date().getFullYear() - 1 + i;
+                                            const yearStr = `${startYear}/${startYear + 1}`;
+                                            return <option key={yearStr} value={yearStr}>{yearStr}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                            )}
+
                             {/* Theme Toggle */}
                             <button
                                 onClick={toggleTheme}

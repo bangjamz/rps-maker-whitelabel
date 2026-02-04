@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Plus, Search, Filter, X, Check, AlertCircle } from 'lucide-react';
 import axios from '../lib/axios';
 import useAuthStore from '../store/useAuthStore';
+import useAcademicStore from '../store/useAcademicStore';
 
 export default function LecturerAssignmentPage() {
     const { user } = useAuthStore();
@@ -22,23 +23,23 @@ export default function LecturerAssignmentPage() {
         catatan: ''
     });
 
-    // Filters
-    const [filters, setFilters] = useState({
-        semester: '',
-        tahunAjaran: '',
-        search: ''
-    });
+    const { activeSemester, activeYear } = useAcademicStore();
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         fetchAssignments();
         fetchCourses();
-    }, []);
+    }, [activeSemester, activeYear]); // Refetch when global context changes
 
     const fetchAssignments = async () => {
         try {
             setLoading(true);
             const res = await axios.get('/api/lecturer-assignments', {
-                params: filters
+                params: {
+                    semester: activeSemester,
+                    tahunAjaran: activeYear,
+                    search: searchQuery
+                }
             });
             setAssignments(res.data);
         } catch (error) {
@@ -143,15 +144,12 @@ export default function LecturerAssignmentPage() {
         );
     };
 
+    // Filter locally if needed, but API likely handles it. 
+    // If API returns all, we filter here:
     const filteredAssignments = assignments.filter(a => {
-        if (filters.search) {
-            const search = filters.search.toLowerCase();
-            return (
-                a.dosen?.nama_lengkap.toLowerCase().includes(search) ||
-                a.mata_kuliah?.nama_mk.toLowerCase().includes(search)
-            );
-        }
-        return true;
+        const matchesContext = a.semester === activeSemester && a.tahun_ajaran === activeYear;
+        // Search is handled by API or here if API ignores it
+        return matchesContext;
     });
 
     return (
@@ -159,9 +157,9 @@ export default function LecturerAssignmentPage() {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Lecturer Assignments</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Penugasan Dosen</h1>
                     <p className="text-gray-600 mt-1">
-                        Kelola penugasan dosen ke mata kuliah
+                        Kelola penugasan dosen untuk Semester {activeSemester} {activeYear}
                     </p>
                 </div>
                 <button
@@ -169,41 +167,24 @@ export default function LecturerAssignmentPage() {
                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                 >
                     <Plus className="w-5 h-5" />
-                    New Assignment
+                    Tambah Penugasan
                 </button>
             </div>
 
             {/* Filters */}
             <div className="bg-white rounded-lg shadow-sm p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search dosen or course..."
-                            value={filters.search}
-                            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                            placeholder="Cari dosen atau mata kuliah..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && fetchAssignments()}
                             className="pl-10 w-full border border-gray-300 rounded-lg px-4 py-2"
                         />
                     </div>
-                    <select
-                        value={filters.semester}
-                        onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
-                        className="border border-gray-300 rounded-lg px-4 py-2"
-                    >
-                        <option value="">All Semesters</option>
-                        <option value="Ganjil">Ganjil</option>
-                        <option value="Genap">Genap</option>
-                    </select>
-                    <select
-                        value={filters.tahunAjaran}
-                        onChange={(e) => setFilters({ ...filters, tahunAjaran: e.target.value })}
-                        className="border border-gray-300 rounded-lg px-4 py-2"
-                    >
-                        <option value="">All Years</option>
-                        <option value="2025/2026">2025/2026</option>
-                        <option value="2024/2025">2024/2025</option>
-                    </select>
                 </div>
             </div>
 
@@ -217,7 +198,7 @@ export default function LecturerAssignmentPage() {
                             <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Semester</th>
                             <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Home Base</th>
                             <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Catatan</th>
-                            <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900">Action</th>
+                            <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -346,8 +327,8 @@ export default function LecturerAssignmentPage() {
                                                 <label
                                                     key={lecturer.id}
                                                     className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition ${formData.dosen_id === lecturer.id
-                                                            ? 'border-blue-500 bg-blue-50'
-                                                            : 'border-gray-200 hover:border-gray-300'
+                                                        ? 'border-blue-500 bg-blue-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
                                                         }`}
                                                 >
                                                     <input
