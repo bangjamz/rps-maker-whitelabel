@@ -27,7 +27,7 @@ const GradingSystem = sequelize.define('GradingSystem', {
         type: DataTypes.ENUM('legacy', 'obe'),
         allowNull: false,
         defaultValue: 'obe',
-        comment: 'Toggle between legacy (UTS/UAS) and OBE (CPL/CPMK/Sub-CPMK) grading'
+        defaultValue: 'obe'
     },
     grade_scale_id: {
         type: DataTypes.INTEGER,

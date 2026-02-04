@@ -27,15 +27,13 @@ const AssessmentComponent = sequelize.define('AssessmentComponent', {
     // Component type determines which fields are used
     component_type: {
         type: DataTypes.ENUM('legacy', 'obe'),
-        allowNull: false,
-        comment: 'Assessment type: legacy (UTS/UAS) or OBE (Sub-CPMK based)'
+        allowNull: false
     },
 
     // For LEGACY mode (traditional assessment)
     legacy_type: {
         type: DataTypes.ENUM('UTS', 'UAS', 'Praktikum', 'Tugas', 'Soft Skill'),
-        allowNull: true,
-        comment: 'Used when component_type = legacy'
+        allowNull: true
     },
     legacy_weight: {
         type: DataTypes.DECIMAL(5, 2),

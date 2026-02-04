@@ -124,10 +124,13 @@ export default function LoginPage() {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Demo Credentials:</p>
                         <div className="space-y-1 text-xs">
                             <p className="text-gray-600 dark:text-gray-300">
-                                <strong>Kaprodi:</strong> kaprodi_ti / password123
+                                <strong>Kaprodi:</strong> kaprodi_informatika / password123
                             </p>
                             <p className="text-gray-600 dark:text-gray-300">
                                 <strong>Dosen:</strong> dosen_andi / password123
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-300">
+                                <strong>Mahasiswa:</strong> mahasiswa_andi / password123
                             </p>
                         </div>
                     </div>

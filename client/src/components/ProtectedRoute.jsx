@@ -33,6 +33,8 @@ export function PublicRoute({ children }) {
             return <Navigate to="/kaprodi/dashboard" replace />;
         } else if (user.role === ROLES.DOSEN) {
             return <Navigate to="/dosen/dashboard" replace />;
+        } else if (user.role === ROLES.MAHASISWA) {
+            return <Navigate to="/mahasiswa/dashboard" replace />;
         } else {
             return <Navigate to="/dashboard" replace />;
         }

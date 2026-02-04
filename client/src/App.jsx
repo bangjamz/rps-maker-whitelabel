@@ -4,6 +4,7 @@ import DashboardLayout from './components/DashboardLayout';
 import LoginPage from './pages/LoginPage';
 import KaprodiDashboard from './pages/KaprodiDashboard';
 import DosenDashboard from './pages/DosenDashboard';
+import MahasiswaDashboard from './pages/MahasiswaDashboard';
 import SettingsPage from './pages/SettingsPage';
 import CurriculumPage from './pages/CurriculumPage';
 import CoursesPage from './pages/CoursesPage';
@@ -72,6 +73,22 @@ function App() {
                                     <Route path="courses/:courseId/attendance" element={<AttendanceMarkingPage />} />
                                     <Route path="rps" element={<div className="p-6"><h1 className="text-2xl font-bold">My RPS Page (Coming Soon)</h1></div>} />
                                     <Route path="grades" element={<div className="p-6"><h1 className="text-2xl font-bold">Grades Page (Coming Soon)</h1></div>} />
+                                </Routes>
+                            </DashboardLayout>
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* Mahasiswa Routes */}
+                <Route
+                    path="/mahasiswa/*"
+                    element={
+                        <ProtectedRoute allowedRoles={[ROLES.MAHASISWA]}>
+                            <DashboardLayout>
+                                <Routes>
+                                    <Route path="dashboard" element={<MahasiswaDashboard />} />
+                                    <Route path="schedule" element={<div className="p-6"><h1 className="text-2xl font-bold">Jadwal Kuliah (Coming Soon)</h1></div>} />
+                                    <Route path="grades" element={<div className="p-6"><h1 className="text-2xl font-bold">Nilai Semester (Coming Soon)</h1></div>} />
                                 </Routes>
                             </DashboardLayout>
                         </ProtectedRoute>

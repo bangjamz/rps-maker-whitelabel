@@ -37,7 +37,7 @@ const Enrollment = sequelize.define('Enrollment', {
         type: DataTypes.ENUM('Active', 'Dropped', 'Completed'),
         allowNull: false,
         defaultValue: 'Active',
-        comment: 'Active=currently enrolled, Dropped=withdrawn, Completed=finished'
+        defaultValue: 'Active'
     },
     enrolled_at: {
         type: DataTypes.DATE,

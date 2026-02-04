@@ -61,10 +61,9 @@ const FinalGrade = sequelize.define('FinalGrade', {
 
     // Approval workflow
     status: {
-        type: DataTypes.ENUM('draft', 'submitted', 'approved'),
+        type: DataTypes.ENUM('Active', 'Dropped', 'Completed'),
         allowNull: false,
-        defaultValue: 'draft',
-        comment: 'Grade submission status'
+        defaultValue: 'Active'
     },
     approved_by: {
         type: DataTypes.INTEGER,

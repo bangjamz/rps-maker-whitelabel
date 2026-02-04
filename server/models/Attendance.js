@@ -26,8 +26,7 @@ const Attendance = sequelize.define('Attendance', {
     status: {
         type: DataTypes.ENUM('Hadir', 'Izin', 'Sakit', 'Alpa'),
         allowNull: false,
-        defaultValue: 'Hadir',
-        comment: 'Hadir=Present, Izin=Excused, Sakit=Sick, Alpa=Unexcused'
+        defaultValue: 'Hadir'
     },
     marked_at: {
         type: DataTypes.DATE,

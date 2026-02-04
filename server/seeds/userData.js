@@ -209,6 +209,32 @@ export const seedUsers = async (institusiId, fakultasList, prodiList) => {
             telepon: '081234567809',
             prodi_id: prodiMap.RMIK.id,
             is_active: true
+        },
+
+        // MAHASISWA - Fakultas Teknik (Informatika)
+        {
+            username: 'mahasiswa_andi',
+            email: 'mahasiswa.andi@mahardika.ac.id',
+            password_hash: hashedPassword,
+            role: 'mahasiswa',
+            nama_lengkap: 'Andi Saputra',
+            nim: '10115001',
+            angkatan: 2023,
+            telepon: '081234567901',
+            prodi_id: prodiMap.IF.id,
+            is_active: true
+        },
+        {
+            username: 'mahasiswa_budi',
+            email: 'mahasiswa.budi@mahardika.ac.id',
+            password_hash: hashedPassword,
+            role: 'mahasiswa',
+            nama_lengkap: 'Budi Santoso',
+            nim: '10115002',
+            angkatan: 2023,
+            telepon: '081234567902',
+            prodi_id: prodiMap.IF.id,
+            is_active: true
         }
     ]);
 
