@@ -4,18 +4,33 @@ import {
     getAllRPS,
     getRPSById,
     createRPS,
-    updateRPS,
+    updateRPS as updateRPSController,
     submitRPS,
     approveRPS,
     rejectRPS,
     deleteRPS
 } from '../controllers/rpsController.js';
+import {
+    getCurriculumTree,
+    createRPS as createRPSDosen,
+    updateRPS as updateRPSDosen,
+    bulkUpsertPertemuan,
+    getDosenCourses
+} from '../controllers/rpsDosenController.js';
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(authenticate);
 
+// ========== DOSEN RPS CREATION & EDITING ==========
+router.get('/curriculum/tree/:prodiId', getCurriculumTree);
+router.get('/dosen/my-courses', authorize(ROLES.DOSEN), getDosenCourses);
+router.post('/dosen/create', authorize(ROLES.DOSEN), createRPSDosen);
+router.put('/dosen/:rpsId/update', authorize(ROLES.DOSEN), updateRPSDosen);
+router.post('/dosen/:rpsId/pertemuan/bulk', authorize(ROLES.DOSEN), bulkUpsertPertemuan);
+
+// ========== GENERAL RPS ROUTES ==========
 // Get all RPS (role-filtered)
 router.get('/', getAllRPS);
 
@@ -26,7 +41,7 @@ router.get('/:id', getRPSById);
 router.post('/', authorize(ROLES.DOSEN, ROLES.KAPRODI), createRPS);
 
 // Update RPS (draft only, owner only)
-router.put('/:id', authorize(ROLES.DOSEN, ROLES.KAPRODI), updateRPS);
+router.put('/:id', authorize(ROLES.DOSEN, ROLES.KAPRODI), updateRPSController);
 
 // Submit RPS for approval (dosen only)
 router.put('/:id/submit', authorize(ROLES.DOSEN), submitRPS);
