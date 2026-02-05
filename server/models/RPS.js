@@ -26,6 +26,11 @@ const RPS = sequelize.define('RPS', {
         defaultValue: false,
         comment: 'True if this is a prodi template RPS, false for actual implementation'
     },
+    revision: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1,
+        comment: 'Revision number (1, 2, 3...)'
+    },
     template_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -46,6 +51,26 @@ const RPS = sequelize.define('RPS', {
         allowNull: true,
         comment: 'e.g. 2026/2027 Ganjil (computed from tahun_ajaran + semester)'
     },
+    bobot_sks: {
+        type: DataTypes.JSON, // { t: 2, p: 1 }
+        allowNull: true
+    },
+    rumpun_mk: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    pengembang_rps: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    koordinator_rumpun_mk: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    ketua_prodi: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     jumlah_pertemuan: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -64,6 +89,11 @@ const RPS = sequelize.define('RPS', {
         type: DataTypes.TEXT,
         allowNull: true,
         comment: 'Pustaka/bibliografi'
+    },
+    sub_cpmk_list: {
+        type: DataTypes.JSON,
+        defaultValue: [],
+        comment: 'List of Sub-CPMKs: [{id, kode, deskripsi, cpmk_id}]'
     },
     status: {
         type: DataTypes.ENUM('draft', 'submitted', 'approved', 'revision', 'rejected'),

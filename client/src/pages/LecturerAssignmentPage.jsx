@@ -34,7 +34,7 @@ export default function LecturerAssignmentPage() {
     const fetchAssignments = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('/api/lecturer-assignments', {
+            const res = await axios.get('/lecturer-assignments', {
                 params: {
                     semester: activeSemester,
                     tahunAjaran: activeYear,
@@ -51,7 +51,7 @@ export default function LecturerAssignmentPage() {
 
     const fetchCourses = async () => {
         try {
-            const res = await axios.get('/api/courses');
+            const res = await axios.get('/courses');
             setCourses(res.data);
         } catch (error) {
             console.error('Failed to fetch courses:', error);
@@ -65,7 +65,7 @@ export default function LecturerAssignmentPage() {
             const course = courses.find(c => c.id === courseId);
             if (!course) return;
 
-            const res = await axios.get('/api/lecturer-assignments/available-lecturers', {
+            const res = await axios.get('/lecturer-assignments/available-lecturers', {
                 params: { prodiId: course.prodi_id }
             });
             setAvailableLecturers(res.data.lecturers || []);
@@ -103,12 +103,33 @@ export default function LecturerAssignmentPage() {
     const handleCreateAssignment = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('/api/lecturer-assignments', formData);
+            await axios.post('/lecturer-assignments', formData);
             fetchAssignments();
             handleCloseModal();
+            alert('Berhasil menugaskan dosen');
         } catch (error) {
-            console.error('Failed to create assignment:', error);
-            alert(error.response?.data?.message || 'Failed to create assignment');
+            if (error.response?.status === 409 && error.response?.data?.existing) {
+                const existing = error.response.data.existing;
+                const confirmReassign = window.confirm(
+                    `Mata kuliah ini sudah ditugaskan ke ${existing.dosen?.nama_lengkap || 'dosen lain'}. \n\nApakah Anda ingin mengganti penugasan ini ke dosen yang baru dipilih? \n(Dosen lama akan menerima notifikasi).`
+                );
+
+                if (confirmReassign) {
+                    try {
+                        // Retry with force: true
+                        await axios.post('/lecturer-assignments', { ...formData, force: true });
+                        fetchAssignments();
+                        handleCloseModal();
+                        alert('Penugasan berhasil diperbarui! Dosen lama telah dinotifikasi.');
+                    } catch (forceError) {
+                        console.error('Failed to force assign:', forceError);
+                        alert(forceError.response?.data?.message || 'Gagal mengganti penugasan');
+                    }
+                }
+            } else {
+                console.error('Failed to create assignment:', error);
+                alert(error.response?.data?.message || 'Gagal membuat penugasan');
+            }
         }
     };
 
@@ -116,7 +137,7 @@ export default function LecturerAssignmentPage() {
         if (!confirm('Hapus assignment ini?')) return;
 
         try {
-            await axios.delete(`/api/lecturer-assignments/${id}`);
+            await axios.delete(`/lecturer-assignments/${id}`);
             fetchAssignments();
         } catch (error) {
             console.error('Failed to delete assignment:', error);

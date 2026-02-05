@@ -1,4 +1,4 @@
-import { DosenAssignment, User, MataKuliah, Prodi, Fakultas } from '../models/index.js';
+import { DosenAssignment, User, MataKuliah, Prodi, Fakultas, Notification } from '../models/index.js';
 import { ROLES } from '../middleware/auth.js';
 
 /**
@@ -174,7 +174,7 @@ export const getAvailableLecturers = async (req, res) => {
  */
 export const createAssignment = async (req, res) => {
     try {
-        const { dosen_id, mata_kuliah_id, semester, tahun_ajaran, catatan } = req.body;
+        const { dosen_id, mata_kuliah_id, semester, tahun_ajaran, catatan, force } = req.body;
         const user = req.user;
 
         // Validation
@@ -208,14 +208,33 @@ export const createAssignment = async (req, res) => {
                 semester,
                 tahun_ajaran,
                 is_active: true
-            }
+            },
+            include: [{ model: User, as: 'dosen' }]
         });
 
         if (existingAssignment) {
-            return res.status(409).json({
-                message: 'This course already has an active assignment for the specified semester',
-                existing: existingAssignment
-            });
+            if (!force) {
+                return res.status(409).json({
+                    message: 'This course already has an active assignment for the specified semester',
+                    existing: existingAssignment
+                });
+            } else {
+                // Deactivate the old assignment
+                existingAssignment.is_active = false;
+                await existingAssignment.save();
+
+                // Notify the replaced lecturer
+                try {
+                    await Notification.create({
+                        user_id: existingAssignment.dosen_id,
+                        title: 'Perubahan Penugasan Mengajar',
+                        message: `Penugasan Anda untuk mata kuliah ${mataKuliah.kode_mk} - ${mataKuliah.nama_mk} (Sem ${semester} ${tahun_ajaran}) telah dialihkan ke dosen lain oleh Kaprodi.`,
+                        type: 'warning'
+                    });
+                } catch (notifWarn) {
+                    console.error('Failed to create notification for replaced lecturer:', notifWarn);
+                }
+            }
         }
 
         // Create assignment
@@ -228,6 +247,19 @@ export const createAssignment = async (req, res) => {
             catatan,
             is_active: true
         });
+
+        // Notify the new lecturer
+        try {
+            await Notification.create({
+                user_id: dosen_id,
+                title: 'Penugasan Mengajar Baru',
+                message: `Anda telah ditugaskan untuk mengampu mata kuliah ${mataKuliah.kode_mk} - ${mataKuliah.nama_mk} pada Semester ${semester} ${tahun_ajaran}.`,
+                type: 'success',
+                link: '/dosen/courses'
+            });
+        } catch (notifErr) {
+            console.error('Failed to create notification for new lecturer:', notifErr);
+        }
 
         // Fetch full assignment with includes
         const fullAssignment = await DosenAssignment.findByPk(assignment.id, {

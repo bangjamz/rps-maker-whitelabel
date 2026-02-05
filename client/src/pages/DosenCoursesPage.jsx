@@ -110,23 +110,11 @@ export default function DosenCoursesPage() {
 
                                 <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-gray-100 dark:border-gray-800">
                                     <button
-                                        onClick={() => {
-                                            if (rps) {
-                                                navigate(`/dosen/rps/${rps.id}/edit`);
-                                            } else {
-                                                navigate('/dosen/rps/create', {
-                                                    state: {
-                                                        courseId: assignment.mata_kuliah.id,
-                                                        semester: assignment.semester,
-                                                        tahunAjaran: assignment.tahun_ajaran
-                                                    }
-                                                });
-                                            }
-                                        }}
-                                        className={`btn btn-sm flex items-center justify-center gap-2 ${rps ? 'btn-outline' : 'btn-primary'}`}
+                                        onClick={() => navigate(`/dosen/rps/${assignment.mata_kuliah.id}`)}
+                                        className="btn btn-sm btn-primary flex items-center justify-center gap-2"
                                     >
                                         <BookOpen size={16} />
-                                        {rps ? 'Edit RPS' : 'Buat RPS'}
+                                        Kelola RPS
                                     </button>
                                     <button
                                         onClick={() => navigate(`/dosen/courses/${assignment.mata_kuliah.id}/grades`)}

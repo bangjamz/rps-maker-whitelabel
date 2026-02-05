@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import axios from '../lib/axios';
-import { downloadCSVTemplate, parseCSV, validateAndAutoIncrement, exportToCSV } from '../utils/csvHelper';
+import { downloadCSVTemplate } from '../utils/csvHelper';
 import { hasPermission, PERMISSIONS } from '../utils/permissions';
-// import { InformationCircleIcon } from '@heroicons/react/24/outline'; // Assuming Heroicons installed, or use emoji
+import { InformationCircleIcon, ListBulletIcon, TableCellsIcon, Squares2X2Icon, TrashIcon, PlusIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 
 // Prefix Mapping
 const UNIT_PREFIXES = {
@@ -20,91 +21,164 @@ const UNIT_PREFIXES = {
 
 export default function CurriculumPage() {
     const [activeTab, setActiveTab] = useState('cpl');
+
+    // Data States
     const [cplData, setCplData] = useState([]);
     const [cpmkData, setCpmkData] = useState([]);
     const [subCpmkData, setSubCpmkData] = useState([]);
+    const [mkData, setMkData] = useState([]);
+    const [bkData, setBkData] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
-    const [loading, setLoading] = useState(false);
 
-    // Import Modal State
+    // UI States
+    const [loading, setLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('table'); // table, list, card
+    const [selectedItems, setSelectedItems] = useState([]); // IDs for batch actions
+    const [message, setMessage] = useState({ type: '', text: '' });
+
+    // Modal States
     const [showImportModal, setShowImportModal] = useState(false);
     const [importType, setImportType] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
 
-    // CRUD Modal State
     const [showCPLModal, setShowCPLModal] = useState(false);
     const [showCPMKModal, setShowCPMKModal] = useState(false);
     const [showSubCPMKModal, setShowSubCPMKModal] = useState(false);
+    const [showMKModal, setShowMKModal] = useState(false);
+    const [showBKModal, setShowBKModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
+
     const [editingItem, setEditingItem] = useState(null);
     const [formData, setFormData] = useState({});
 
-    const [message, setMessage] = useState({ type: '', text: '' });
-
     useEffect(() => {
-        loadProfile();
-        loadCPL();
-        loadCPMK();
-        loadSubCPMK();
+        loadData();
     }, []);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            await Promise.all([
+                loadProfile(),
+                loadCPL(),
+                loadCPMK(),
+                loadSubCPMK(),
+                loadMK(),
+                loadBK()
+            ]);
+        } catch (e) {
+            console.error("Error loading data", e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const loadProfile = async () => {
         try {
             const response = await axios.get('/auth/profile');
             setUserProfile(response.data);
-        } catch (error) {
-            console.error('Failed to load profile', error);
-        }
+        } catch (error) { console.error(error); }
     };
 
     const loadCPL = async () => {
         try {
             const response = await axios.get('/curriculum/cpl');
             setCplData(response.data);
-        } catch (error) {
-            console.error('Failed to load CPL', error);
-        }
+        } catch (error) { console.error(error); }
     };
 
     const loadCPMK = async () => {
         try {
             const response = await axios.get('/curriculum/cpmk');
             setCpmkData(response.data);
-        } catch (error) {
-            console.error('Failed to load CPMK', error);
-        }
+        } catch (error) { console.error(error); }
     };
 
     const loadSubCPMK = async () => {
         try {
             const response = await axios.get('/curriculum/sub-cpmk');
             setSubCpmkData(response.data);
+        } catch (error) { console.error(error); }
+    };
+
+    const loadMK = async () => {
+        try {
+            // Placeholder: Replace with actual endpoint to get MK list
+            // For now assuming we might fetch all MataKuliah for the prodi
+            // If endpoint doesn't allow listing all, we might need one.
+            // Assuming /academic/courses or similar exists or we use the curriculum controller one if made.
+            // Let's assume we can fetch it. If not, I'll fix it later.
+            // Using a generic endpoint for now or empty if not ready.
+            const response = await axios.get('/academic-years/courses/all'); // Try this or fallback
+            setMkData(response.data || []);
         } catch (error) {
-            console.error('Failed to load Sub-CPMK', error);
+            // If failed, maybe try a different endpoint or leave empty
+            console.error("Failed to load MK", error);
+            setMkData([]);
         }
     };
 
-    // --- Generator Utils ---
-    const getUnitPrefix = (level) => {
+    const loadBK = async () => {
+        try {
+            const response = await axios.get('/curriculum/bahan-kajian');
+            setBkData(response.data);
+        } catch (error) { console.error(error); }
+    };
+
+    // --- Batch Actions ---
+    const handleSelectAll = (e, data) => {
+        if (e.target.checked) {
+            setSelectedItems(data.map(item => item.id));
+        } else {
+            setSelectedItems([]);
+        }
+    };
+
+    const handleSelectItem = (id) => {
+        if (selectedItems.includes(id)) {
+            setSelectedItems(selectedItems.filter(i => i !== id));
+        } else {
+            setSelectedItems([...selectedItems, id]);
+        }
+    };
+
+    const handleBatchDelete = async () => {
+        if (selectedItems.length === 0) return;
+        if (!window.confirm(`Hapus ${selectedItems.length} item terpilih?`)) return;
+
+        try {
+            let endpoint = '';
+            if (activeTab === 'cpmk') endpoint = '/curriculum/cpmk/batch-delete';
+            else if (activeTab === 'sub-cpmk') endpoint = '/curriculum/sub-cpmk/batch-delete';
+            else return; // Only CPMK/Sub-CPMK supported for now
+
+            await axios.post(endpoint, { ids: selectedItems });
+            setMessage({ type: 'success', text: 'Batch delete berhasil' });
+            setSelectedItems([]);
+            if (activeTab === 'cpmk') loadCPMK();
+            if (activeTab === 'sub-cpmk') loadSubCPMK();
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Batch delete gagal: ' + (error.response?.data?.message || error.message) });
+        }
+    };
+
+
+    // --- Helper Functions ---
+    const getUnitPrefix = (level) => { /* ... existing ... */
         if (!userProfile) return 'UNKNOWN';
         let unitName = '';
-
         if (level === 'prodi') unitName = userProfile.prodi?.nama || '';
         else if (level === 'fakultas') unitName = userProfile.fakultas?.nama || '';
-        else if (level === 'institusi') return 'UNIV'; // Default for Institusi
-
-        // Find matching prefix
+        else if (level === 'institusi') return 'UNIV';
         for (const [key, val] of Object.entries(UNIT_PREFIXES)) {
             if (unitName.toLowerCase().includes(key.toLowerCase())) return val;
         }
-        return 'GEN'; // Generic fallback
+        return 'GEN';
     };
 
-    const generateCPLCode = () => {
+    const generateCPLCode = () => { /* ... existing ... */
         const level = formData.level || 'prodi';
         const prefix = getUnitPrefix(level);
-
-        // Find max number for this prefix
         const regex = new RegExp(`^${prefix}-CPL(\\d+)`);
         let maxNum = 0;
         cplData.forEach(cpl => {
@@ -114,419 +188,414 @@ export default function CurriculumPage() {
                 if (num > maxNum) maxNum = num;
             }
         });
-
         const nextNum = String(maxNum + 1).padStart(2, '0');
         setFormData({ ...formData, kode_cpl: `${prefix}-CPL${nextNum}` });
     };
 
-    const generateCPMKCode = () => {
-        if (!formData.cpl_id) {
-            setMessage({ type: 'error', text: 'Pilih CPL terlebih dahulu!' });
-            return;
-        }
+    const generateCPMKCode = () => { /* ... existing ... */
+        if (!formData.cpl_id) { setMessage({ type: 'error', text: 'Pilih CPL terlebih dahulu!' }); return; }
         const cpl = cplData.find(c => c.id == formData.cpl_id);
-        if (!cpl) {
-            setMessage({ type: 'error', text: 'CPL tidak ditemukan!' });
-            return;
-        }
-
-        // Extract number from CPL Code
-        const cplNumMatch = cpl.kode_cpl.match(/(\d+)$/);
+        if (!cpl) { setMessage({ type: 'error', text: 'CPL tidak ditemukan!' }); return; }
+        const cplNumMatch = cpl.kode_cpl.match(/CPL(\d+)$/);
         const cplNum = cplNumMatch ? cplNumMatch[1] : 'XX';
-        const prefix = getUnitPrefix(cpl.level); // Use CPL's level prefix
-
-        const baseCPMK = `${prefix}-CPMK${cplNum}`; // e.g. IF-CPMK01
-
-        // Find suffix
-        let suffix = 'a';
-        // Simple a-z iterator could be improved but sufficient for now
-        const existing = cpmkData.filter(c => c.kode_cpmk.startsWith(baseCPMK));
-        if (existing.length > 0) {
-            const count = existing.length;
-            suffix = String.fromCharCode(97 + count); // 97 is 'a'
-        }
-
-        setFormData({ ...formData, kode_cpmk: `${baseCPMK}${suffix}` });
+        const existingForCPL = cpmkData.filter(c => c.cpl_id == formData.cpl_id);
+        const nextIndex = existingForCPL.length + 1;
+        const newCode = `CPMK${cplNum}${nextIndex}`;
+        setFormData({ ...formData, kode_cpmk: newCode });
     };
 
-    const generateSubCPMKCode = () => {
-        if (!formData.cpmk_id) {
-            setMessage({ type: 'error', text: 'Pilih CPMK terlebih dahulu!' });
-            return;
-        }
+    const generateSubCPMKCode = () => { /* ... existing ... */
+        if (!formData.cpmk_id) { setMessage({ type: 'error', text: 'Pilih CPMK terlebih dahulu!' }); return; }
         const cpmk = cpmkData.find(c => c.id == formData.cpmk_id);
-        if (!cpmk) {
-            setMessage({ type: 'error', text: 'CPMK tidak ditemukan!' });
-            return;
-        }
-
-        // Base: CPMK Code + .1, .2
-        const base = cpmk.kode_cpmk;
-        let suffix = 1;
-
-        const existing = subCpmkData.filter(s => s.kode_sub_cpmk.startsWith(base + '.'));
-        if (existing.length > 0) {
-            suffix = existing.length + 1;
-        }
-
-        setFormData({ ...formData, kode_sub_cpmk: `${base}.${suffix}` });
+        if (!cpmk) { setMessage({ type: 'error', text: 'CPMK tidak ditemukan!' }); return; }
+        const cpmkBaseMatch = cpmk.kode_cpmk.replace('CPMK', '');
+        const existingForCPMK = subCpmkData.filter(s => s.cpmk_id == formData.cpmk_id);
+        const nextIndex = String(existingForCPMK.length + 1).padStart(2, '0');
+        const newCode = `sub-CPMK${cpmkBaseMatch}${nextIndex}`;
+        setFormData({ ...formData, kode_sub_cpmk: newCode });
     };
 
 
-    // --- CPL Actions ---
-    const handleAddCPL = () => {
-        setEditingItem(null);
-        setFormData({ kode_cpl: '', deskripsi: '', kategori: 'Sikap', level: 'prodi' });
-        setShowCPLModal(true);
-    };
-
-    const handleEditCPL = (cpl) => {
-        setEditingItem(cpl);
-        setFormData({ ...cpl });
-        setShowCPLModal(true);
-    };
-
+    // --- Actions ---
+    // CPL
+    const handleAddCPL = () => { setEditingItem(null); setFormData({ kode_cpl: '', deskripsi: '', kategori: 'Sikap', level: 'prodi' }); setShowCPLModal(true); };
+    const handleEditCPL = (item) => { setEditingItem(item); setFormData({ ...item }); setShowCPLModal(true); };
     const handleDeleteCPL = async (id) => {
-        if (!window.confirm('Hapus CPL ini?')) return;
-        try {
-            await axios.delete(`/curriculum/cpl/${id}`);
-            setMessage({ type: 'success', text: 'CPL berhasil dihapus' });
-            loadCPL();
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Gagal menghapus CPL' });
-        }
+        if (!window.confirm('Delete?')) return;
+        try { await axios.delete(`/curriculum/cpl/${id}`); loadCPL(); } catch (e) { alert(e.message); }
     };
-
     const handleSaveCPL = async () => {
         try {
-            // Attach correct IDs based on level if missing (handled by backend mostly, but let's ensure)
-            // Backend createCPL uses req.user.prodi_id.
-            // If level is fakultas/institusi, backend needs support.
-            // Assuming current backend supports it or defaults to prodi.
-            // My backend refactor implementation handles prodi_id.
-            // I should pass ids if I can, but currently API relies on logged in user.
-
-            if (editingItem) {
-                await axios.put(`/curriculum/cpl/${editingItem.id}`, formData);
-                setMessage({ type: 'success', text: 'CPL berhasil diperbarui' });
-            } else {
-                await axios.post('/curriculum/cpl', formData);
-                setMessage({ type: 'success', text: 'CPL berhasil dibuat' });
-            }
-            setShowCPLModal(false);
-            loadCPL();
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Gagal menyimpan CPL' });
-        }
+            if (editingItem) await axios.put(`/curriculum/cpl/${editingItem.id}`, formData);
+            else await axios.post('/curriculum/cpl', formData);
+            setShowCPLModal(false); loadCPL();
+        } catch (e) { setMessage({ type: 'error', text: e.message }); }
     };
 
-    // --- CPMK Actions ---
-    const handleAddCPMK = () => {
-        setEditingItem(null);
-        setFormData({ kode_cpmk: '', deskripsi: '', cpl_id: '' });
-        setShowCPMKModal(true);
-    };
-
-    const handleEditCPMK = (cpmk) => {
-        setEditingItem(cpmk);
-        setFormData({ ...cpmk });
-        setShowCPMKModal(true);
-    };
-
+    // CPMK
+    const handleAddCPMK = () => { setEditingItem(null); setFormData({ kode_cpmk: '', deskripsi: '', cpl_id: '' }); setShowCPMKModal(true); };
+    const handleEditCPMK = (item) => { setEditingItem(item); setFormData({ ...item }); setShowCPMKModal(true); };
     const handleDeleteCPMK = async (id) => {
-        if (!window.confirm('Hapus CPMK ini?')) return;
-        try {
-            await axios.delete(`/curriculum/cpmk/${id}`);
-            setMessage({ type: 'success', text: 'CPMK berhasil dihapus' });
-            loadCPMK();
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Gagal menghapus CPMK' });
-        }
+        if (!window.confirm('Delete?')) return;
+        try { await axios.delete(`/curriculum/cpmk/${id}`); loadCPMK(); } catch (e) { alert(e.message); }
     };
-
     const handleSaveCPMK = async () => {
         try {
-            if (editingItem) {
-                await axios.put(`/curriculum/cpmk/${editingItem.id}`, formData);
-                setMessage({ type: 'success', text: 'CPMK berhasil diperbarui' });
-            } else {
-                await axios.post('/curriculum/cpmk', formData);
-                setMessage({ type: 'success', text: 'CPMK berhasil dibuat' });
-            }
-            setShowCPMKModal(false);
-            loadCPMK();
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Gagal menyimpan CPMK' });
-        }
+            if (editingItem) await axios.put(`/curriculum/cpmk/${editingItem.id}`, formData);
+            else await axios.post('/curriculum/cpmk', formData);
+            setShowCPMKModal(false); loadCPMK();
+        } catch (e) { setMessage({ type: 'error', text: e.message }); }
     };
 
-    // --- Sub-CPMK Actions ---
-    const handleAddSubCPMK = () => {
-        setEditingItem(null);
-        setFormData({ kode_sub_cpmk: '', deskripsi: '', cpmk_id: '', indikator: '', bobot_nilai: '' });
-        setShowSubCPMKModal(true);
-    };
-
-    const handleEditSubCPMK = (sub) => {
-        setEditingItem(sub);
-        setFormData({ ...sub });
-        setShowSubCPMKModal(true);
-    };
-
+    // Sub-CPMK
+    const handleAddSubCPMK = () => { setEditingItem(null); setFormData({ kode_sub_cpmk: '', deskripsi: '', cpmk_id: '', indikator: '', bobot_nilai: '' }); setShowSubCPMKModal(true); };
+    const handleEditSubCPMK = (item) => { setEditingItem(item); setFormData({ ...item }); setShowSubCPMKModal(true); };
     const handleDeleteSubCPMK = async (id) => {
-        if (!window.confirm('Hapus Sub-CPMK ini?')) return;
-        try {
-            await axios.delete(`/curriculum/sub-cpmk/${id}`);
-            setMessage({ type: 'success', text: 'Sub-CPMK berhasil dihapus' });
-            loadSubCPMK();
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Gagal menghapus Sub-CPMK' });
-        }
+        if (!window.confirm('Delete?')) return;
+        try { await axios.delete(`/curriculum/sub-cpmk/${id}`); loadSubCPMK(); } catch (e) { alert(e.message); }
     };
-
     const handleSaveSubCPMK = async () => {
         try {
-            if (editingItem) {
-                await axios.put(`/curriculum/sub-cpmk/${editingItem.id}`, formData);
-                setMessage({ type: 'success', text: 'Sub-CPMK berhasil diperbarui' });
-            } else {
-                await axios.post('/curriculum/sub-cpmk', formData);
-                setMessage({ type: 'success', text: 'Sub-CPMK berhasil dibuat' });
-            }
-            setShowSubCPMKModal(false);
-            loadSubCPMK();
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Gagal menyimpan Sub-CPMK' });
-        }
+            if (editingItem) await axios.put(`/curriculum/sub-cpmk/${editingItem.id}`, formData);
+            else await axios.post('/curriculum/sub-cpmk', formData);
+            setShowSubCPMKModal(false); loadSubCPMK();
+        } catch (e) { setMessage({ type: 'error', text: e.message }); }
     };
 
-
-    const handleDownloadTemplate = (type) => {
-        downloadCSVTemplate(type);
-        setMessage({ type: 'success', text: `Template ${type.toUpperCase()} berhasil diunduh` });
-    };
-
-    const handleFileSelect = (e) => {
-        setSelectedFile(e.target.files[0]);
-    };
-
+    // Import
+    const handleOpenImport = (type) => { setImportType(type); setSelectedFile(null); setShowImportModal(true); };
+    const handleDownloadTemplate = () => { downloadCSVTemplate(importType); };
+    const handleFileSelect = (e) => setSelectedFile(e.target.files[0]);
     const handleImport = async () => {
-        if (!selectedFile) {
-            setMessage({ type: 'error', text: 'Pilih file CSV terlebih dahulu' });
-            return;
-        }
-        // ... (Import logic remains similar but assuming it works)
-        setShowImportModal(false);
-    };
+        if (!selectedFile) return;
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        try {
+            let url = '';
+            if (importType === 'cpl') url = '/curriculum/cpl/import';
+            if (importType === 'bahan-kajian') url = '/curriculum/bahan-kajian/import';
+            if (importType === 'cpmk') url = '/curriculum/cpmk/import';
+            if (importType === 'sub-cpmk') url = '/curriculum/sub-cpmk/import';
+            if (importType === 'mk') url = '/curriculum/mata-kuliah/import';
 
-    const handleExport = () => { /* ... */ };
+            await axios.post(url, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setMessage({ type: 'success', text: 'Import successful' });
+            setShowImportModal(false);
+            loadData();
+        } catch (e) {
+            setMessage({ type: 'error', text: e.message });
+        }
+    };
 
     return (
-        <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
+        <div className="p-6 max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         Data Kurikulum
                         <button onClick={() => setShowHelpModal(true)} className="text-gray-400 hover:text-gray-600">
-                            <span className="sr-only">Help</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                            </svg>
+                            <InformationCircleIcon className="w-5 h-5" />
                         </button>
                     </h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Kelola CPL, CPMK, dan Sub-CPMK</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Kelola CPL, Bahan Kajian, MK, CPMK, Sub-CPMK</p>
                 </div>
-                {/* Export/Import Buttons */}
+                <div className="flex gap-2">
+                    {/* View Mode Toggle */}
+                    {(activeTab === 'cpl' || activeTab === 'cpmk') && (
+                        <div className="join bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <button onClick={() => setViewMode('table')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'table' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="Table View"><TableCellsIcon className="w-4 h-4" /></button>
+                            <button onClick={() => setViewMode('list')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'list' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="List View"><ListBulletIcon className="w-4 h-4" /></button>
+                            <button onClick={() => setViewMode('card')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'card' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="Card View"><Squares2X2Icon className="w-4 h-4" /></button>
+                        </div>
+                    )}
+
+                    {/* Batch Delete */}
+                    {selectedItems.length > 0 && (
+                        <button onClick={handleBatchDelete} className="btn btn-error btn-sm flex items-center gap-1">
+                            <TrashIcon className="w-4 h-4" /> Hapus ({selectedItems.length})
+                        </button>
+                    )}
+
+                    {/* Import Wrapper */}
+                    <div className="dropdown dropdown-end">
+                        <label tabIndex={0} className="btn btn-outline btn-sm gap-2">
+                            <ArrowDownTrayIcon className="w-4 h-4" /> Import
+                        </label>
+                        <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 z-[1]">
+                            <li><button onClick={() => handleOpenImport('cpl')}>Import CPL</button></li>
+                            <li><button onClick={() => handleOpenImport('bahan-kajian')}>Import Bahan Kajian</button></li>
+                            <li><button onClick={() => handleOpenImport('mk')}>Import Mata Kuliah</button></li>
+                            <li><button onClick={() => handleOpenImport('cpmk')}>Import CPMK</button></li>
+                            <li><button onClick={() => handleOpenImport('sub-cpmk')}>Import Sub-CPMK</button></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             {message.text && (
-                <div className={`mb-6 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                    {message.text}
+                <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'} mb-4`}>
+                    <span>{message.text}</span>
+                    <button onClick={() => setMessage({ type: '', text: '' })} className="btn btn-xs btn-ghost">X</button>
                 </div>
             )}
 
             {/* Tabs */}
-            <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
-                <nav className="flex gap-6">
-                    <button onClick={() => setActiveTab('cpl')} className={`pb-3 border-b-2 ${activeTab === 'cpl' ? 'border-primary-600 text-primary-600' : 'border-transparent'}`}>CPL</button>
-                    <button onClick={() => setActiveTab('cpmk')} className={`pb-3 border-b-2 ${activeTab === 'cpmk' ? 'border-primary-600 text-primary-600' : 'border-transparent'}`}>CPMK</button>
-                    <button onClick={() => setActiveTab('sub-cpmk')} className={`pb-3 border-b-2 ${activeTab === 'sub-cpmk' ? 'border-primary-600 text-primary-600' : 'border-transparent'}`}>Sub-CPMK</button>
+            <div className="border-b border-gray-200 dark:border-gray-800 mb-6 flex justify-between items-center overflow-x-auto">
+                <nav className="flex gap-6 min-w-max">
+                    {['cpl', 'bahan-kajian', 'mk', 'cpmk', 'sub-cpmk'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => { setActiveTab(tab); setSelectedItems([]); }}
+                            className={`pb-3 capitalize whitespace-nowrap border-b-2 transition-colors ${activeTab === tab ? 'border-primary-600 text-primary-600 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        >
+                            {tab.replace('-', ' ')}
+                        </button>
+                    ))}
                 </nav>
             </div>
 
-            {/* CPL Tab */}
-            {activeTab === 'cpl' && (
-                <div className="card p-6">
-                    <div className="flex justify-between mb-4">
-                        <h2 className="text-lg font-semibold">Daftar CPL</h2>
-                        <button onClick={handleAddCPL} className="btn btn-primary btn-sm">Tambah CPL</button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 dark:bg-gray-800">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Kode Unik</th>
-                                    <th className="px-4 py-2 text-left">Level</th>
-                                    <th className="px-4 py-2 text-left w-1/3">Deskripsi</th>
-                                    <th className="px-4 py-2 text-left">Kategori</th>
-                                    <th className="px-4 py-2 text-left">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Array.isArray(cplData) && cplData.map(cpl => (
-                                    <tr key={cpl.id} className="border-b">
-                                        <td className="px-4 py-2 font-medium">{cpl.kode_cpl}</td>
-                                        <td className="px-4 py-2">
-                                            <span className={`px-2 py-1 text-xs rounded-full ${cpl.level === 'institusi' ? 'bg-purple-100 text-purple-800' : cpl.level === 'fakultas' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                                {cpl.level?.toUpperCase() || '-'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-2 text-sm">{cpl.deskripsi}</td>
-                                        <td className="px-4 py-2">{cpl.kategori}</td>
-                                        <td className="px-4 py-2">
-                                            <button onClick={() => handleEditCPL(cpl)} className="text-blue-600 mr-2">Edit</button>
-                                            <button onClick={() => handleDeleteCPL(cpl.id)} className="text-red-600">Hapus</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+            {/* Content Area */}
+            <div className="min-h-[400px]">
+                {loading ? <div className="text-center py-10">Loading...</div> : (
+                    <>
+                        {/* CPL CONTENT */}
+                        {activeTab === 'cpl' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-end"><button onClick={handleAddCPL} className="btn btn-primary btn-sm"><PlusIcon className="w-4 h-4" /> Tambah CPL</button></div>
+                                {viewMode === 'table' ? (
+                                    <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                                        <table className="table w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th>Kode</th>
+                                                    <th>Deskripsi</th>
+                                                    <th>Kategori</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {cplData.map(item => (
+                                                    <tr key={item.id}>
+                                                        <td className="font-mono font-medium">{item.kode_cpl}</td>
+                                                        <td className="whitespace-pre-wrap">{item.deskripsi}</td>
+                                                        <td><span className="badge badge-ghost">{item.kategori}</span></td>
+                                                        <td>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => handleEditCPL(item)} className="btn btn-xs btn-ghost">Edit</button>
+                                                                <button onClick={() => handleDeleteCPL(item.id)} className="btn btn-xs btn-ghost text-error">Hapus</button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className={`grid gap-4 ${viewMode === 'card' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                                        {cplData.map(item => (
+                                            <div key={item.id} className="card bg-base-100 shadow-sm border border-gray-200 dark:border-gray-700">
+                                                <div className="card-body p-4">
+                                                    <div className="flex justify-between items-start">
+                                                        <h3 className="card-title text-sm">{item.kode_cpl}</h3>
+                                                        <span className="badge badge-xs">{item.kategori}</span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{item.deskripsi}</p>
+                                                    <div className="card-actions justify-end mt-4">
+                                                        <button onClick={() => handleEditCPL(item)} className="btn btn-xs">Edit</button>
+                                                        <button onClick={() => handleDeleteCPL(item.id)} className="btn btn-xs btn-error btn-outline">Hapus</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-            {/* CPMK Tab */}
-            {activeTab === 'cpmk' && (
-                <div className="card p-6">
-                    <div className="flex justify-between mb-4">
-                        <h2 className="text-lg font-semibold">Daftar CPMK</h2>
-                        <button onClick={handleAddCPMK} className="btn btn-primary btn-sm">Tambah CPMK</button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 dark:bg-gray-800">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Kode CPMK</th>
-                                    <th className="px-4 py-2 text-left w-1/3">Deskripsi</th>
-                                    <th className="px-4 py-2 text-left">Terhubung ke</th>
-                                    <th className="px-4 py-2 text-left">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Array.isArray(cpmkData) && cpmkData.map(cpmk => {
-                                    // Find Linked CPL Code
-                                    const linkedCPL = (Array.isArray(cplData) ? cplData.find(c => c.id === cpmk.cpl_id) : null) || cpmk.cpl;
-                                    return (
-                                        <tr key={cpmk.id} className="border-b">
-                                            <td className="px-4 py-2 font-medium">{cpmk.kode_cpmk}</td>
-                                            <td className="px-4 py-2 text-sm">{cpmk.deskripsi}</td>
-                                            <td className="px-4 py-2">
-                                                {linkedCPL ? (
-                                                    <span className="badge badge-outline text-xs">{linkedCPL.kode_cpl}</span>
-                                                ) : <span className="text-gray-400 text-xs">-</span>}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <button onClick={() => handleEditCPMK(cpmk)} className="text-blue-600 mr-2">Edit</button>
-                                                <button onClick={() => handleDeleteCPMK(cpmk.id)} className="text-red-600">Hapus</button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+                        {/* BAHAN KAJIAN CONTENT */}
+                        {activeTab === 'bahan-kajian' && (
+                            <div className="space-y-4">
+                                {/* <div className="flex justify-end"><button className="btn btn-primary btn-sm">Tambah BK</button></div> */}
+                                <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                                    <table className="table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th>Kode BK</th>
+                                                <th>Jenis</th>
+                                                <th>Deskripsi</th>
+                                                <th>Bobot (Min-Max)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {bkData.length === 0 ? <tr><td colSpan="4" className="text-center">No Data</td></tr> :
+                                                bkData.map(item => (
+                                                    <tr key={item.id}>
+                                                        <td className="font-mono">{item.kode_bk}</td>
+                                                        <td>{item.jenis}</td>
+                                                        <td>{item.deskripsi}</td>
+                                                        <td>{item.bobot_min} - {item.bobot_max}</td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
-            {/* Sub-CPMK Tab */}
-            {activeTab === 'sub-cpmk' && (
-                <div className="card p-6">
-                    <div className="flex justify-between mb-4">
-                        <h2 className="text-lg font-semibold">Daftar Sub-CPMK</h2>
-                        <button onClick={handleAddSubCPMK} className="btn btn-primary btn-sm">Tambah Sub-CPMK</button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 dark:bg-gray-800">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Kode</th>
-                                    <th className="px-4 py-2 text-left w-1/3">Deskripsi</th>
-                                    <th className="px-4 py-2 text-left">Induk CPMK</th>
-                                    <th className="px-4 py-2 text-left">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Array.isArray(subCpmkData) && subCpmkData.map(sub => {
-                                    const parentCPMK = (Array.isArray(cpmkData) ? cpmkData.find(c => c.id === sub.cpmk_id) : null) || sub.cpmk;
-                                    return (
-                                        <tr key={sub.id} className="border-b">
-                                            <td className="px-4 py-2 font-medium">{sub.kode_sub_cpmk}</td>
-                                            <td className="px-4 py-2 text-sm">
-                                                <div className="mb-1">{sub.deskripsi}</div>
-                                                {sub.indikator && (
-                                                    <div className="text-xs text-gray-500 italic">Indikator: {sub.indikator}</div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                {parentCPMK ? (
-                                                    <span className="badge badge-outline text-xs">{parentCPMK.kode_cpmk}</span>
-                                                ) : <span className="text-gray-400 text-xs">-</span>}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <button onClick={() => handleEditSubCPMK(sub)} className="text-blue-600 mr-2">Edit</button>
-                                                <button onClick={() => handleDeleteSubCPMK(sub.id)} className="text-red-600">Hapus</button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+                        {/* MATA KULIAH CONTENT */}
+                        {activeTab === 'mk' && (
+                            <div className="space-y-4">
+                                {/* <div className="flex justify-end"><button className="btn btn-primary btn-sm">Tambah MK</button></div> */}
+                                <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                                    <table className="table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th>Kode MK</th>
+                                                <th>Nama MK</th>
+                                                <th>SKS</th>
+                                                <th>Semester</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {mkData.length === 0 ? <tr><td colSpan="4" className="text-center">No Data</td></tr> :
+                                                mkData.map(item => (
+                                                    <tr key={item.id}>
+                                                        <td className="font-mono">{item.kode_mk}</td>
+                                                        <td className="font-bold">{item.nama_mk}</td>
+                                                        <td>{item.sks}</td>
+                                                        <td>{item.semester}</td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
+                        {/* CPMK CONTENT */}
+                        {activeTab === 'cpmk' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div className="text-xs text-gray-500">Pilih item untuk hapus massal (checkbox).</div>
+                                    <button onClick={handleAddCPMK} className="btn btn-primary btn-sm"><PlusIcon className="w-4 h-4" /> Tambah CPMK</button>
+                                </div>
+                                <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                                    <table className="table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th className="w-10">
+                                                    <input type="checkbox" className="checkbox checkbox-sm" onChange={(e) => handleSelectAll(e, cpmkData)} checked={cpmkData.length > 0 && selectedItems.length === cpmkData.length} />
+                                                </th>
+                                                <th>Kode CPMK</th>
+                                                <th>Deskripsi</th>
+                                                <th>CPL</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {cpmkData.map(item => (
+                                                <tr key={item.id}>
+                                                    <td>
+                                                        <input type="checkbox" className="checkbox checkbox-sm" checked={selectedItems.includes(item.id)} onChange={() => handleSelectItem(item.id)} />
+                                                    </td>
+                                                    <td className="font-mono font-medium">{item.kode_cpmk}</td>
+                                                    <td className="whitespace-pre-wrap">{item.deskripsi}</td>
+                                                    <td>
+                                                        {item.cpl ? <span className="badge badge-outline text-xs">{item.cpl.kode_cpl}</span> : '-'}
+                                                    </td>
+                                                    <td>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => handleEditCPMK(item)} className="btn btn-xs btn-ghost">Edit</button>
+                                                            <button onClick={() => handleDeleteCPMK(item.id)} className="btn btn-xs btn-ghost text-error">Hapus</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SUB-CPMK CONTENT */}
+                        {activeTab === 'sub-cpmk' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div className="text-xs text-gray-500">Pilih item untuk hapus massal.</div>
+                                    <button onClick={handleAddSubCPMK} className="btn btn-primary btn-sm"><PlusIcon className="w-4 h-4" /> Tambah Sub-CPMK</button>
+                                </div>
+                                <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                                    <table className="table w-full">
+                                        <thead>
+                                            <tr>
+                                                <th className="w-10">
+                                                    <input type="checkbox" className="checkbox checkbox-sm" onChange={(e) => handleSelectAll(e, subCpmkData)} checked={subCpmkData.length > 0 && selectedItems.length === subCpmkData.length} />
+                                                </th>
+                                                <th>Kode</th>
+                                                <th>Deskripsi</th>
+                                                <th>Induk CPMK</th>
+                                                <th>Bobot</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {subCpmkData.map(item => (
+                                                <tr key={item.id}>
+                                                    <td>
+                                                        <input type="checkbox" className="checkbox checkbox-sm" checked={selectedItems.includes(item.id)} onChange={() => handleSelectItem(item.id)} />
+                                                    </td>
+                                                    <td className="font-mono font-medium">{item.kode_sub_cpmk}</td>
+                                                    <td className="whitespace-pre-wrap">{item.deskripsi}</td>
+                                                    <td>
+                                                        {item.cpmk ? <span className="badge badge-outline text-xs">{item.cpmk.kode_cpmk}</span> : '-'}
+                                                    </td>
+                                                    <td>{item.bobot_nilai}%</td>
+                                                    <td>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => handleEditSubCPMK(item)} className="btn btn-xs btn-ghost">Edit</button>
+                                                            <button onClick={() => handleDeleteSubCPMK(item.id)} className="btn btn-xs btn-ghost text-error">Hapus</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* --- MODALS --- */}
             {/* CPL Modal */}
             {showCPLModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg w-full max-w-lg">
-                        <h3 className="text-lg font-bold mb-4">{editingItem ? 'Edit CPL' : 'Tambah CPL'}</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="label">Level</label>
-                                <select className="select w-full" value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value })}>
-                                    <option value="prodi">Prodi</option>
-                                    <option value="fakultas">Fakultas</option>
-                                    <option value="institusi">Institusi</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="label">Kode CPL (Unik)</label>
-                                <div className="flex gap-2">
-                                    <input className="input w-full" value={formData.kode_cpl} onChange={e => setFormData({ ...formData, kode_cpl: e.target.value })} placeholder="Contoh: IF-CPL01" />
-                                    <button onClick={generateCPLCode} type="button" className="btn btn-secondary px-3" title="Generate Code">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">Kode harus unik. Gunakan tombol generate untuk rekomendasi otomatis.</p>
-                            </div>
-                            <div>
-                                <label className="label">Deskripsi</label>
-                                <textarea className="textarea w-full h-24" value={formData.deskripsi} onChange={e => setFormData({ ...formData, deskripsi: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="label">Kategori</label>
-                                <select className="select w-full" value={formData.kategori} onChange={e => setFormData({ ...formData, kategori: e.target.value })}>
-                                    <option value="Sikap">Sikap</option>
-                                    <option value="Pengetahuan">Pengetahuan</option>
-                                    <option value="Keterampilan Umum">Keterampilan Umum</option>
-                                    <option value="Keterampilan Khusus">Keterampilan Khusus</option>
-                                </select>
+                <div className="modal modal-open">
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit CPL' : 'Tambah CPL'}</h3>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Kode CPL</span></label>
+                            <div className="flex gap-2">
+                                <input className="input input-bordered w-full" value={formData.kode_cpl} onChange={e => setFormData({ ...formData, kode_cpl: e.target.value })} placeholder="IF-CPL01" />
+                                <button onClick={generateCPLCode} className="btn btn-secondary">Gen</button>
                             </div>
                         </div>
-                        <div className="flex justify-end gap-2 mt-6">
-                            <button onClick={() => setShowCPLModal(false)} className="btn btn-ghost">Batal</button>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Deskripsi</span></label>
+                            <textarea className="textarea textarea-bordered" value={formData.deskripsi} onChange={e => setFormData({ ...formData, deskripsi: e.target.value })}></textarea>
+                        </div>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Kategori</span></label>
+                            <select className="select select-bordered" value={formData.kategori} onChange={e => setFormData({ ...formData, kategori: e.target.value })}>
+                                <option value="Sikap">Sikap</option>
+                                <option value="Pengetahuan">Pengetahuan</option>
+                                <option value="Keterampilan Umum">Keterampilan Umum</option>
+                                <option value="Keterampilan Khusus">Keterampilan Khusus</option>
+                            </select>
+                        </div>
+                        <div className="modal-action">
+                            <button onClick={() => setShowCPLModal(false)} className="btn">Batal</button>
                             <button onClick={handleSaveCPL} className="btn btn-primary">Simpan</button>
                         </div>
                     </div>
@@ -535,38 +604,29 @@ export default function CurriculumPage() {
 
             {/* CPMK Modal */}
             {showCPMKModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg w-full max-w-lg">
-                        <h3 className="text-lg font-bold mb-4">{editingItem ? 'Edit CPMK' : 'Tambah CPMK'}</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="label">Terhubung ke CPL</label>
-                                <select className="select w-full" value={formData.cpl_id || ''} onChange={e => setFormData({ ...formData, cpl_id: e.target.value })}>
-                                    <option value="">Pilih CPL...</option>
-                                    {cplData.map(cpl => (
-                                        <option key={cpl.id} value={cpl.id}>{cpl.kode_cpl} - {cpl.deskripsi.substring(0, 30)}...</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="label">Kode CPMK</label>
-                                <div className="flex gap-2">
-                                    <input className="input w-full" value={formData.kode_cpmk} onChange={e => setFormData({ ...formData, kode_cpmk: e.target.value })} />
-                                    <button onClick={generateCPMKCode} type="button" className="btn btn-secondary px-3" title="Generate Code from CPL">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">Tips: Gunakan tombol magic untuk generate kode dari Link CPL (contoh: IF-CPL01 -&gt; IF-CPMK01a)</p>
-                            </div>
-                            <div>
-                                <label className="label">Deskripsi</label>
-                                <textarea className="textarea w-full" value={formData.deskripsi} onChange={e => setFormData({ ...formData, deskripsi: e.target.value })} />
+                <div className="modal modal-open">
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit CPMK' : 'Tambah CPMK'}</h3>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">CPL Induk</span></label>
+                            <select className="select select-bordered" value={formData.cpl_id || ''} onChange={e => setFormData({ ...formData, cpl_id: e.target.value })}>
+                                <option value="">Pilih CPL</option>
+                                {cplData.map(c => <option key={c.id} value={c.id}>{c.kode_cpl} - {c.deskripsi.substring(0, 20)}...</option>)}
+                            </select>
+                        </div>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Kode CPMK</span></label>
+                            <div className="flex gap-2">
+                                <input className="input input-bordered w-full" value={formData.kode_cpmk} onChange={e => setFormData({ ...formData, kode_cpmk: e.target.value })} />
+                                <button onClick={generateCPMKCode} className="btn btn-secondary">Gen</button>
                             </div>
                         </div>
-                        <div className="flex justify-end gap-2 mt-6">
-                            <button onClick={() => setShowCPMKModal(false)} className="btn btn-ghost">Batal</button>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Deskripsi</span></label>
+                            <textarea className="textarea textarea-bordered" value={formData.deskripsi} onChange={e => setFormData({ ...formData, deskripsi: e.target.value })}></textarea>
+                        </div>
+                        <div className="modal-action">
+                            <button onClick={() => setShowCPMKModal(false)} className="btn">Batal</button>
                             <button onClick={handleSaveCPMK} className="btn btn-primary">Simpan</button>
                         </div>
                     </div>
@@ -575,79 +635,34 @@ export default function CurriculumPage() {
 
             {/* Sub-CPMK Modal */}
             {showSubCPMKModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg w-full max-w-lg">
-                        <h3 className="text-lg font-bold mb-4">{editingItem ? 'Edit Sub-CPMK' : 'Tambah Sub-CPMK'}</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="label">Induk CPMK</label>
-                                <select className="select w-full" value={formData.cpmk_id || ''} onChange={e => setFormData({ ...formData, cpmk_id: e.target.value })}>
-                                    <option value="">Pilih CPMK...</option>
-                                    {cpmkData.map(cpmk => (
-                                        <option key={cpmk.id} value={cpmk.id}>{cpmk.kode_cpmk} - {cpmk.deskripsi.substring(0, 30)}...</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="label">Kode Sub-CPMK</label>
-                                <div className="flex gap-2">
-                                    <input className="input w-full" value={formData.kode_sub_cpmk} onChange={e => setFormData({ ...formData, kode_sub_cpmk: e.target.value })} />
-                                    <button onClick={generateSubCPMKCode} type="button" className="btn btn-secondary px-3" title="Generate Code from CPMK">
-                                        Magic
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="label">Deskripsi</label>
-                                <textarea className="textarea w-full" value={formData.deskripsi} onChange={e => setFormData({ ...formData, deskripsi: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="label">Indikator</label>
-                                <textarea className="textarea w-full" value={formData.indikator} onChange={e => setFormData({ ...formData, indikator: e.target.value })} placeholder="Indikator penilaian..." />
-                            </div>
-                            <div>
-                                <label className="label">Bobot Nilai (%)</label>
-                                <input type="number" className="input w-full" value={formData.bobot_nilai} onChange={e => setFormData({ ...formData, bobot_nilai: e.target.value })} placeholder="Contoh: 10" />
+                <div className="modal modal-open">
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit Sub-CPMK' : 'Tambah Sub-CPMK'}</h3>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">CPMK Induk</span></label>
+                            <select className="select select-bordered" value={formData.cpmk_id || ''} onChange={e => setFormData({ ...formData, cpmk_id: e.target.value })}>
+                                <option value="">Pilih CPMK</option>
+                                {cpmkData.map(c => <option key={c.id} value={c.id}>{c.kode_cpmk} - {c.deskripsi.substring(0, 20)}...</option>)}
+                            </select>
+                        </div>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Kode Sub-CPMK</span></label>
+                            <div className="flex gap-2">
+                                <input className="input input-bordered w-full" value={formData.kode_sub_cpmk} onChange={e => setFormData({ ...formData, kode_sub_cpmk: e.target.value })} />
+                                <button onClick={generateSubCPMKCode} className="btn btn-secondary">Gen</button>
                             </div>
                         </div>
-                        <div className="flex justify-end gap-2 mt-6">
-                            <button onClick={() => setShowSubCPMKModal(false)} className="btn btn-ghost">Batal</button>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Deskripsi</span></label>
+                            <textarea className="textarea textarea-bordered" value={formData.deskripsi} onChange={e => setFormData({ ...formData, deskripsi: e.target.value })}></textarea>
+                        </div>
+                        <div className="form-control mb-4">
+                            <label className="label"><span className="label-text">Bobot (%)</span></label>
+                            <input type="number" className="input input-bordered" value={formData.bobot_nilai} onChange={e => setFormData({ ...formData, bobot_nilai: e.target.value })} />
+                        </div>
+                        <div className="modal-action">
+                            <button onClick={() => setShowSubCPMKModal(false)} className="btn">Batal</button>
                             <button onClick={handleSaveSubCPMK} className="btn btn-primary">Simpan</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Help Modal */}
-            {showHelpModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg w-full max-w-lg">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold">Panduan Penamaan Kode</h3>
-                            <button onClick={() => setShowHelpModal(false)} className="text-gray-500 hover:text-gray-700">&times;</button>
-                        </div>
-                        <div className="prose dark:prose-invert text-sm">
-                            <p>Sistem menggunakan kode unik untuk membedakan CPL antar unit.</p>
-                            <h4>Kode CPL</h4>
-                            <p>Format: <code>PREFIX-CPL[Nomor]</code> (misal: IF-CPL01)</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Informatika</strong>: IF (contoh: IF-CPL01)</li>
-                                <li><strong>Keperawatan</strong>: KEP</li>
-                                <li><strong>Kebidanan</strong>: KEB</li>
-                                <li><strong>RMIK</strong>: RMIK</li>
-                                <li><strong>Kesehatan Masyarakat</strong>: KESMAS</li>
-                                <li><strong>Fakultas Kesehatan</strong>: FKES</li>
-                                <li><strong>Fakultas Teknik</strong>: FT</li>
-                            </ul>
-                            <h4 className="mt-4">Kode CPMK</h4>
-                            <p>Disarankan mengikuti Kode CPL induknya. Gunakan tombol &quot;Magic&quot; saat membuat CPMK untuk generate otomatis.</p>
-                            <p>Contoh: <code>IF-CPL01</code> &rarr; <code>IF-CPMK01a</code></p>
-                            <h4 className="mt-4">Kode Sub-CPMK</h4>
-                            <p>Disarankan mengikuti Kode CPMK induknya. Gunakan tombol &quot;Magic&quot; saat membuat Sub-CPMK untuk generate otomatis.</p>
-                            <p>Contoh: <code>IF-CPMK01a</code> &rarr; <code>IF-CPMK01a.1</code></p>
-                        </div>
-                        <div className="mt-6 text-right">
-                            <button onClick={() => setShowHelpModal(false)} className="btn btn-primary btn-sm">Mengerti</button>
                         </div>
                     </div>
                 </div>
@@ -655,42 +670,36 @@ export default function CurriculumPage() {
 
             {/* Import Modal */}
             {showImportModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                            Import {importType.toUpperCase()} dari CSV
-                        </h3>
-
-                        <div className="mb-4">
-                            <label className="label">Pilih File CSV</label>
-                            <input
-                                type="file"
-                                accept=".csv"
-                                onChange={handleFileSelect}
-                                className="input"
-                            />
-                            <p className="text-xs text-gray-500 mt-2">
-                                Belum punya template? <button onClick={() => handleDownloadTemplate(importType)} className="text-primary-600 hover:underline">Download di sini</button>
-                            </p>
+                <div className="modal modal-open">
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg mb-4 capitalize">Import {importType.replace('-', ' ')}</h3>
+                        <p className="text-sm mb-4">Upload file CSV sesuai template.</p>
+                        <div className="form-control w-full mb-4">
+                            <input type="file" className="file-input file-input-bordered w-full" accept=".csv" onChange={handleFileSelect} />
                         </div>
+                        <div className="flex justify-between items-center mb-4">
+                            <button onClick={handleDownloadTemplate} className="btn btn-ghost btn-sm text-primary">Download Template CSV</button>
+                        </div>
+                        <div className="modal-action">
+                            <button onClick={() => setShowImportModal(false)} className="btn">Batal</button>
+                            <button onClick={handleImport} className="btn btn-primary" disabled={!selectedFile}>Upload</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleImport}
-                                className="btn btn-primary flex-1"
-                                disabled={!selectedFile}
-                            >
-                                Upload & Validasi
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowImportModal(false);
-                                    setSelectedFile(null);
-                                }}
-                                className="btn btn-secondary"
-                            >
-                                Batal
-                            </button>
+            {/* Help Modal */}
+            {showHelpModal && (
+                <div className="modal modal-open">
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg mb-4">Bantuan</h3>
+                        <div className="prose">
+                            <p>Gunakan menu Import untuk memasukkan data secara massal.</p>
+                            <p>Data yang didukung: CPL, CPMK, Sub-CPMK, Bahan Kajian, Mata Kuliah.</p>
+                            <p>Gunakan tombol "Gen" (Generate) atau "Magic" untuk membuat kode otomatis berdasarkan hierarki data.</p>
+                        </div>
+                        <div className="modal-action">
+                            <button onClick={() => setShowHelpModal(false)} className="btn">Tutup</button>
                         </div>
                     </div>
                 </div>

@@ -82,7 +82,7 @@ export const getAllRPS = async (req, res) => {
 };
 
 /**
- * Get RPS by Course ID
+ * Get RPS by Course ID (Latest)
  * GET /api/rps/by-course/:courseId
  * Returns the latest RPS for a given course (if exists)
  */
@@ -122,6 +122,43 @@ export const getRPSByCourse = async (req, res) => {
     } catch (error) {
         console.error('Get RPS by course error:', error);
         res.status(500).json({ message: 'Failed to retrieve RPS for course' });
+    }
+};
+
+/**
+ * Get all RPS versions for a course
+ * GET /api/rps/versions/:courseId
+ */
+export const getVersionsByCourse = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+
+        const versions = await RPS.findAll({
+            where: { mata_kuliah_id: courseId },
+            attributes: ['id', 'status', 'revision', 'updated_at', 'is_template', 'semester', 'tahun_ajaran'],
+            include: [
+                {
+                    model: User,
+                    as: 'dosen',
+                    attributes: ['id', 'nama_lengkap']
+                },
+                {
+                    model: User,
+                    as: 'approved_by_user',
+                    attributes: ['id', 'nama_lengkap']
+                }
+            ],
+            order: [
+                ['is_template', 'DESC'], // Templates first
+                ['revision', 'DESC'],    // Latest revision first
+                ['updated_at', 'DESC']
+            ]
+        });
+
+        res.json(versions);
+    } catch (error) {
+        console.error('Get RPS versions error:', error);
+        res.status(500).json({ message: 'Failed to retrieve RPS versions' });
     }
 };
 

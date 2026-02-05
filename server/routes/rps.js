@@ -4,6 +4,7 @@ import {
     getAllRPS,
     getRPSById,
     getRPSByCourse,
+    getVersionsByCourse,
     createRPS,
     updateRPS as updateRPSController,
     submitRPS,
@@ -11,9 +12,11 @@ import {
     rejectRPS,
     deleteRPS
 } from '../controllers/rpsController.js';
+// Import createRevision
 import {
     getCurriculumTree,
     createRPS as createRPSDosen,
+    createRevision,
     updateRPS as updateRPSDosen,
     bulkUpsertPertemuan,
     getDosenCourses,
@@ -30,6 +33,7 @@ router.use(authenticate);
 router.get('/curriculum/tree/:prodiId', getCurriculumTree);
 router.get('/dosen/my-courses', authorize(ROLES.DOSEN, ROLES.KAPRODI), getDosenCourses);
 router.post('/dosen/create', authorize(ROLES.DOSEN, ROLES.KAPRODI), createRPSDosen);
+router.post('/dosen/:rpsId/revise', authorize(ROLES.DOSEN, ROLES.KAPRODI), createRevision);
 router.put('/dosen/:rpsId/update', authorize(ROLES.DOSEN, ROLES.KAPRODI, ROLES.DEKAN), updateRPSDosen);
 router.post('/dosen/:rpsId/pertemuan/bulk', authorize(ROLES.DOSEN, ROLES.KAPRODI, ROLES.DEKAN), bulkUpsertPertemuan);
 
@@ -43,6 +47,9 @@ router.get('/', getAllRPS);
 
 // Get RPS by Course ID (for checking if RPS exists)
 router.get('/by-course/:courseId', getRPSByCourse);
+
+// Get all RPS versions for a course
+router.get('/versions/:courseId', getVersionsByCourse);
 
 // Get RPS by ID
 router.get('/:id', getRPSById);

@@ -262,7 +262,7 @@ export default function CoursesPage() {
     const [loading, setLoading] = useState(false);
     const { activeSemester, activeYear } = useAcademicStore();
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewMode, setViewMode] = useState('grid'); // grid, list, table
+    const [viewMode, setViewMode] = useState('list'); // grid, list, table
     const [editingCourse, setEditingCourse] = useState(null);
     const [assigningCourse, setAssigningCourse] = useState(null);
 

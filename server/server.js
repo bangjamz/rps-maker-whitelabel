@@ -14,6 +14,9 @@ import attendanceRoutes from './routes/attendance.js';
 import enrollmentRoutes from './routes/enrollment.js';
 import analyticsRoutes from './routes/analytics.js';
 import cplAnalyticsRoutes from './routes/cplAnalytics.js';
+import notificationRoutes from './routes/notifications.js';
+import academicYearRoutes from './routes/academicYears.js';
+import curriculumRoutes from './routes/curriculum.js';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +45,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/enrollment', enrollmentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/cpl-analytics', cplAnalyticsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/academic-years', academicYearRoutes);
+app.use('/api/curriculum', curriculumRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

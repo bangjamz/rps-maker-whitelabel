@@ -1,3 +1,4 @@
+
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
@@ -7,40 +8,45 @@ const BahanKajian = sequelize.define('BahanKajian', {
         primaryKey: true,
         autoIncrement: true
     },
+    prodi_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
     kode_bk: {
-        type: DataTypes.STRING(10),
-        allowNull: false,
-        unique: true
+        type: DataTypes.STRING(20),
+        allowNull: false
+        // Removed unique: true to allow different prodis to potentially have same code, 
+        // though typically they should be unique within a prodi. 
+        // We can enforce compound unique index if needed.
     },
-    jenis_bk: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-        comment: 'Bahan Kajian Wajib Informatika, BK Tambahan (Opsional), BK Wajib SN Dikti, BK Wajib Umum'
+    jenis: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: 'Inti / Institusional / IPTEKS / dll'
     },
-    bahan_kajian: {
-        type: DataTypes.STRING(200),
+    deskripsi: {
+        type: DataTypes.TEXT,
         allowNull: false
     },
     bobot_min: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 2
+        type: DataTypes.DECIMAL(4, 2),
+        allowNull: true
     },
     bobot_max: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 4
-    },
-    kode_kategori: {
-        type: DataTypes.STRING(1),
-        allowNull: false,
-        comment: 'A = Wajib, B = Opsional, C = SN Dikti, D = Umum'
+        type: DataTypes.DECIMAL(4, 2),
+        allowNull: true
     }
 }, {
     tableName: 'bahan_kajian',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    indexes: [
+        {
+            fields: ['prodi_id', 'kode_bk'],
+            unique: true
+        }
+    ]
 });
 
 export default BahanKajian;

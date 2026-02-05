@@ -91,7 +91,7 @@ export default function RPSManagementPage() {
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full border ${styles[status]}`}>
                 {icons[status]}
-                {status.charAt(0).toUpperCase() + status.slice(1)}
+                {status === 'pending' ? 'Butuh Review' : status === 'approved' ? 'Disetujui' : status === 'rejected' ? 'Ditolak' : 'Draft'}
             </span>
         );
     };
@@ -119,9 +119,9 @@ export default function RPSManagementPage() {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">RPS Management</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Manajemen RPS</h1>
                 <p className="text-gray-600 mt-1">
-                    {canApproveRPS() ? 'Review and approve RPS documents' : 'View RPS documents'}
+                    {canApproveRPS() ? 'Review dan setujui dokumen RPS' : 'Lihat dokumen RPS'}
                 </p>
             </div>
 
@@ -130,7 +130,7 @@ export default function RPSManagementPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-amber-700">Pending Review</p>
+                            <p className="text-sm text-amber-700">Butuh Review</p>
                             <p className="text-2xl font-bold text-amber-900">{pendingRPS.length}</p>
                         </div>
                         <Clock className="w-8 h-8 text-amber-600" />
@@ -139,7 +139,7 @@ export default function RPSManagementPage() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-green-700">Approved</p>
+                            <p className="text-sm text-green-700">Disetujui</p>
                             <p className="text-2xl font-bold text-green-900">{approvedRPS.length}</p>
                         </div>
                         <CheckCircle className="w-8 h-8 text-green-600" />
@@ -157,7 +157,7 @@ export default function RPSManagementPage() {
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-red-700">Rejected</p>
+                            <p className="text-sm text-red-700">Ditolak</p>
                             <p className="text-2xl font-bold text-red-900">{rejectedRPS.length}</p>
                         </div>
                         <XCircle className="w-8 h-8 text-red-600" />
@@ -172,7 +172,7 @@ export default function RPSManagementPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search course or lecturer..."
+                            placeholder="Cari mata kuliah atau dosen..."
                             value={filters.search}
                             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                             className="pl-10 w-full border border-gray-300 rounded-lg px-4 py-2"
@@ -183,18 +183,18 @@ export default function RPSManagementPage() {
                         onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                         className="border border-gray-300 rounded-lg px-4 py-2"
                     >
-                        <option value="">All Status</option>
+                        <option value="">Semua Status</option>
                         <option value="draft">Draft</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
+                        <option value="pending">Butuh Review</option>
+                        <option value="approved">Disetujui</option>
+                        <option value="rejected">Ditolak</option>
                     </select>
                     <select
                         value={filters.semester}
                         onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
                         className="border border-gray-300 rounded-lg px-4 py-2"
                     >
-                        <option value="">All Semesters</option>
+                        <option value="">Semua Semester</option>
                         <option value="Ganjil">Ganjil</option>
                         <option value="Genap">Genap</option>
                     </select>
@@ -203,7 +203,7 @@ export default function RPSManagementPage() {
                         onChange={(e) => setFilters({ ...filters, tahunAjaran: e.target.value })}
                         className="border border-gray-300 rounded-lg px-4 py-2"
                     >
-                        <option value="">All Years</option>
+                        <option value="">Semua Tahun</option>
                         <option value="2025/2026">2025/2026</option>
                         <option value="2024/2025">2024/2025</option>
                     </select>
@@ -219,21 +219,21 @@ export default function RPSManagementPage() {
                             <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Dosen</th>
                             <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Semester</th>
                             <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Status</th>
-                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Last Updated</th>
-                            <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900">Actions</th>
+                            <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900">Terakhir Diupdate</th>
+                            <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                         {loading ? (
                             <tr>
                                 <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                                    Loading RPS list...
+                                    Memuat daftar RPS...
                                 </td>
                             </tr>
                         ) : filteredRPS.length === 0 ? (
                             <tr>
                                 <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                                    No RPS found
+                                    Tidak ada RPS ditemukan
                                 </td>
                             </tr>
                         ) : (
@@ -272,7 +272,7 @@ export default function RPSManagementPage() {
                                                 className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
                                             >
                                                 <Eye className="w-4 h-4" />
-                                                View
+                                                Lihat
                                             </button>
                                             {canApproveRPS() && rps.status === 'pending' && (
                                                 <>
@@ -281,14 +281,14 @@ export default function RPSManagementPage() {
                                                         className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center gap-1"
                                                     >
                                                         <CheckCircle className="w-4 h-4" />
-                                                        Approve
+                                                        Setujui
                                                     </button>
                                                     <button
                                                         onClick={() => handleOpenApprovalModal(rps, 'reject')}
                                                         className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1"
                                                     >
                                                         <XCircle className="w-4 h-4" />
-                                                        Reject
+                                                        Tolak
                                                     </button>
                                                 </>
                                             )}
@@ -310,12 +310,12 @@ export default function RPSManagementPage() {
                                 {approvalAction === 'approve' ? (
                                     <>
                                         <CheckCircle className="w-6 h-6 text-green-600" />
-                                        Approve RPS
+                                        Setujui RPS
                                     </>
                                 ) : (
                                     <>
                                         <XCircle className="w-6 h-6 text-red-600" />
-                                        Reject RPS
+                                        Tolak RPS
                                     </>
                                 )}
                             </h2>
@@ -332,14 +332,14 @@ export default function RPSManagementPage() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Catatan {approvalAction === 'reject' ? '*' : '(Optional)'}
+                                    Catatan {approvalAction === 'reject' ? '*' : '(Opsional)'}
                                 </label>
                                 <textarea
                                     value={catatan}
                                     onChange={(e) => setCatatan(e.target.value)}
                                     placeholder={
                                         approvalAction === 'approve'
-                                            ? 'Add any comments or feedback...'
+                                            ? 'Tambahkan komentar atau masukan...'
                                             : 'Jelaskan alasan penolakan...'
                                     }
                                     rows="4"
@@ -355,22 +355,22 @@ export default function RPSManagementPage() {
                                     disabled={processing}
                                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                                 >
-                                    Cancel
+                                    Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={processing || (approvalAction === 'reject' && !catatan.trim())}
                                     className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${approvalAction === 'approve'
-                                            ? 'bg-green-600 hover:bg-green-700'
-                                            : 'bg-red-600 hover:bg-red-700'
+                                        ? 'bg-green-600 hover:bg-green-700'
+                                        : 'bg-red-600 hover:bg-red-700'
                                         }`}
                                 >
                                     {processing ? (
-                                        <>Processing...</>
+                                        <>Memproses...</>
                                     ) : (
                                         <>
                                             {approvalAction === 'approve' ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-                                            {approvalAction === 'approve' ? 'Approve RPS' : 'Reject RPS'}
+                                            {approvalAction === 'approve' ? 'Setujui RPS' : 'Tolak RPS'}
                                         </>
                                     )}
                                 </button>

@@ -6,9 +6,11 @@ import KaprodiDashboard from './pages/KaprodiDashboard';
 import DosenDashboard from './pages/DosenDashboard';
 import MahasiswaDashboard from './pages/MahasiswaDashboard';
 import SettingsPage from './pages/SettingsPage';
+import ProfilePage from './pages/ProfilePage';
 import CurriculumPage from './pages/CurriculumPage';
 import CoursesPage from './pages/CoursesPage';
 import RPSViewPage from './pages/RPSViewPage';
+import RPSVersionsPage from './pages/RPSVersionsPage';
 import LecturerAssignmentPage from './pages/LecturerAssignmentPage';
 import RPSManagementPage from './pages/RPSManagementPage';
 import DosenCoursesPage from './pages/DosenCoursesPage';
@@ -47,7 +49,8 @@ function App() {
                                     <Route path="courses" element={<CoursesPage />} />
                                     <Route path="lecturer-assignments" element={<LecturerAssignmentPage />} />
                                     <Route path="courses/:courseId/enrollment" element={<EnrollmentManagementPage />} />
-                                    <Route path="rps/:courseId" element={<RPSViewPage />} />
+                                    <Route path="rps/:courseId" element={<RPSVersionsPage />} />
+                                    <Route path="rps/view/:rpsId" element={<RPSViewPage />} />
                                     <Route path="rps" element={<RPSManagementPage />} />
                                     <Route path="rps/create" element={<RPSEditorPage />} />
                                     <Route path="rps/:rpsId/edit" element={<RPSEditorPage />} />
@@ -64,7 +67,7 @@ function App() {
                 <Route
                     path="/dosen/*"
                     element={
-                        <ProtectedRoute allowedRoles={[ROLES.DOSEN]}>
+                        <ProtectedRoute allowedRoles={[ROLES.DOSEN, ROLES.KAPRODI]}>
                             <DashboardLayout>
                                 <Routes>
                                     <Route path="dashboard" element={<DosenDashboard />} />
@@ -73,6 +76,7 @@ function App() {
                                     <Route path="courses/:courseId/grades" element={<GradeInputPage />} />
                                     <Route path="courses/:courseId/attendance" element={<AttendanceMarkingPage />} />
                                     <Route path="rps" element={<RPSManagementPage />} />
+                                    <Route path="rps/:courseId" element={<RPSVersionsPage />} />
                                     <Route path="rps/create" element={<RPSEditorPage />} />
                                     <Route path="rps/:rpsId/edit" element={<RPSEditorPage />} />
                                     <Route path="grades" element={<div className="p-6"><h1 className="text-2xl font-bold">Grades Page (Coming Soon)</h1></div>} />
@@ -93,6 +97,17 @@ function App() {
                                     <Route path="schedule" element={<div className="p-6"><h1 className="text-2xl font-bold">Jadwal Kuliah (Coming Soon)</h1></div>} />
                                     <Route path="grades" element={<div className="p-6"><h1 className="text-2xl font-bold">Nilai Semester (Coming Soon)</h1></div>} />
                                 </Routes>
+                            </DashboardLayout>
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/profile"
+                    element={
+                        <ProtectedRoute>
+                            <DashboardLayout>
+                                <ProfilePage />
                             </DashboardLayout>
                         </ProtectedRoute>
                     }

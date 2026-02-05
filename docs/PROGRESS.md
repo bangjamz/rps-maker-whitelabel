@@ -111,6 +111,20 @@
 - [ ] QR Code Attendance
 - [ ] Mahasiswa Self-Service Portal
 
+## Phase 6.8: Curriculum & Theme Enhancements (2026-02-05) ✅
+- [x] Curriculum Import Functionality
+  - [x] CSV Import for CPL, Bahan Kajian, MK, CPMK, Sub-CPMK
+  - [x] Template download integration
+  - [x] "Magic" code generation for CPMK/Sub-CPMK
+- [x] Batch Operations
+  - [x] Batch delete for CPMK & Sub-CPMK
+- [x] Theme Customization
+  - [x] Notion-style profile customization (Cover Image)
+  - [x] Refined Login Page responsive design
+  - [x] Added Help Menu (Login & Dashboard)
+- [x] View Options
+  - [x] Toggle Table/Card/List view for Curriculum Data
+
 ## Known Issues & Fixes Log (2024-02-04)
 | Issue | Status | Solution |
 |-------|--------|----------|

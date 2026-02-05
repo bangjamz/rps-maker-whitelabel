@@ -3,7 +3,16 @@ import useAuthStore from '../store/useAuthStore';
 import useThemeStore from '../store/useThemeStore';
 import useAcademicStore from '../store/useAcademicStore';
 import { isAdmin, isDosen } from '../utils/permissions';
-import { Calendar } from 'lucide-react';
+import { ROLES } from '../utils/permissions';
+import {
+    Calendar, Bell, User, Settings, LogOut, ChevronDown,
+    Home, GraduationCap, BookOpen, FileText, Users, BarChart, Award
+} from 'lucide-react';
+import axios from '../lib/axios';
+import { useState, useEffect, useMemo } from 'react';
+
+import { useState, useEffect, useMemo } from 'react';
+import HelpModal from './HelpModal';
 
 export default function DashboardLayout({ children }) {
     const location = useLocation();
@@ -11,6 +20,47 @@ export default function DashboardLayout({ children }) {
     const { user, logout } = useAuthStore();
     const { theme, toggleTheme } = useThemeStore();
     const { activeSemester, activeYear, setSemester, setYear } = useAcademicStore();
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showHelp, setShowHelp] = useState(false);
+
+    // Role Switcher State
+    const [activeRole, setActiveRole] = useState(user?.role || ROLES.DOSEN);
+
+    // Notifications State
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Sync activeRole with user.role on mount/change
+    useEffect(() => {
+        if (user?.role) {
+            setActiveRole(user.role);
+        }
+    }, [user?.role]);
+
+    // Handle Role Switch
+    const handleRoleSwitch = (e) => {
+        const newRole = e.target.value;
+        setActiveRole(newRole);
+
+        // Navigate to the respective dashboard to avoid dead links
+        if (newRole === ROLES.KAPRODI) {
+            navigate('/kaprodi/dashboard');
+        } else if (newRole === ROLES.DOSEN) {
+            navigate('/dosen/dashboard');
+        }
+    };
+
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const res = await axios.get('/notifications');
+                setUnreadCount(res.data.unreadCount || 0);
+            } catch (err) {
+                console.error('Failed to fetch notifications', err);
+            }
+        };
+        fetchNotifications();
+    }, []);
 
     const handleLogout = () => {
         logout();
@@ -18,19 +68,51 @@ export default function DashboardLayout({ children }) {
     };
 
     // Navigation items based on role
-    const navItems = user?.role === 'kaprodi' ? [
-        { path: '/kaprodi/dashboard', label: 'Dashboard' },
-        { path: '/kaprodi/curriculum', label: 'Data Kurikulum' },
-        { path: '/kaprodi/courses', label: 'Mata Kuliah' },
-        { path: '/kaprodi/lecturer-assignments', label: 'Penugasan Dosen' }, // Moved up
-        { path: '/kaprodi/rps', label: 'Kelola RPS' },
-        { path: '/kaprodi/reports', label: 'Laporan' },
-    ] : isDosen() ? [
-        { path: '/dosen/dashboard', label: 'Dashboard' },
-        { path: '/dosen/courses', label: 'Mata Kuliah Saya' },
-        { path: '/dosen/rps', label: 'RPS Saya' },
-        { path: '/dosen/grades', label: 'Penilaian' },
-    ] : [];
+    const navItems = useMemo(() => {
+        const items = [
+            {
+                label: 'Profil',
+                icon: User,
+                path: '/profile'
+            }
+        ];
+
+        // KAPRODI VIEW
+        if (activeRole === ROLES.KAPRODI) {
+            return [
+                ...items,
+                { label: 'Dashboard', icon: Home, path: '/kaprodi/dashboard' },
+                { label: 'Data CPL CPMK', icon: GraduationCap, path: '/kaprodi/curriculum' },
+                { label: 'Mata Kuliah', icon: BookOpen, path: '/kaprodi/courses' },
+                { label: 'Kelola RPS', icon: FileText, path: '/kaprodi/rps' },
+                { label: 'Penugasan Dosen', icon: Users, path: '/kaprodi/lecturer-assignments' },
+                { label: 'Laporan', icon: BarChart, path: '/kaprodi/reports' }, // Placeholder
+            ];
+        }
+
+        // DOSEN VIEW (Active Role is Dosen OR User is just Dosen)
+        if (activeRole === ROLES.DOSEN) {
+            return [
+                ...items,
+                { label: 'Dashboard', icon: Home, path: '/dosen/dashboard' },
+                { label: 'Mata Kuliah Saya', icon: BookOpen, path: '/dosen/courses' },
+                { label: 'RPS Saya', icon: FileText, path: '/dosen/rps' },
+                // { label: 'Penilaian', icon: Award, path: '/dosen/grades' },
+            ];
+        }
+
+        // MAHASISWA VIEW
+        if (activeRole === ROLES.MAHASISWA) {
+            return [
+                ...items,
+                { label: 'Dashboard', icon: Home, path: '/mahasiswa/dashboard' },
+                { label: 'Jadwal Kuliah', icon: Calendar, path: '/mahasiswa/schedule' },
+                { label: 'Nilai Semester', icon: Award, path: '/mahasiswa/grades' },
+            ];
+        }
+
+        return items;
+    }, [activeRole]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -44,9 +126,32 @@ export default function DashboardLayout({ children }) {
                         className="w-12 h-12 rounded-lg object-cover"
                     />
                     <div>
-                        <h1 className="font-bold text-gray-900 dark:text-white">RPS Maker</h1>
+                        <h1 className="font-bold text-gray-900 dark:text-white">SAMPIRANS</h1>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Institut Mahardika</p>
                     </div>
+                </div>
+
+                {/* Role Switcher or Badge */}
+                <div className="px-6 mb-6">
+                    {user?.role === ROLES.KAPRODI ? (
+                        <div className="relative">
+                            <select
+                                value={activeRole}
+                                onChange={handleRoleSwitch}
+                                className="w-full appearance-none bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 py-2 pl-4 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                <option value={ROLES.KAPRODI}>Kaprodi</option>
+                                <option value={ROLES.DOSEN}>Dosen</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-primary-600 dark:text-primary-400">
+                                <ChevronDown className="w-4 h-4" />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="inline-flex px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+                            {user?.role === ROLES.DOSEN ? 'Dosen' : 'Mahasiswa'}
+                        </div>
+                    )}
                 </div>
 
                 {/* Navigation */}
@@ -92,24 +197,22 @@ export default function DashboardLayout({ children }) {
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 Selamat datang, {user?.nama_lengkap}
                             </h2>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {user?.role === 'kaprodi' ? 'Ketua Program Studi' : 'Dosen'}
-                            </p>
+                            {/* Role moved to sidebar */}
                         </div>
 
-                        {/* Right: Semester Selector, Theme Toggle, Logout */}
+                        {/* Right: Semester Selector, Theme Toggle, Account */}
                         <div className="flex items-center gap-3">
                             {/* Semester Selector (Kaprodi Only) */}
                             {user?.role === 'kaprodi' && (
                                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                                    <Calendar className="w-4 h-4 text-gray-500" />
+                                    <span className="text-xs text-gray-500 font-medium">Semester Aktif:</span>
                                     <select
                                         value={activeSemester}
                                         onChange={(e) => setSemester(e.target.value)}
                                         className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer text-gray-700 dark:text-gray-300 pr-8"
                                     >
-                                        <option value="Ganjil">Sem. Ganjil</option>
-                                        <option value="Genap">Sem. Genap</option>
+                                        <option value="Ganjil">Ganjil</option>
+                                        <option value="Genap">Genap</option>
                                     </select>
                                     <span className="text-gray-300">|</span>
                                     <select
@@ -143,13 +246,71 @@ export default function DashboardLayout({ children }) {
                                 )}
                             </button>
 
-                            {/* Logout */}
-                            <button
-                                onClick={handleLogout}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                            >
-                                Keluar
+                            {/* Notifications */}
+                            <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
+                                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                                )}
                             </button>
+
+                            {/* Account Dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                    className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-sm">
+                                        {user?.nama_lengkap?.charAt(0) || 'U'}
+                                    </div>
+                                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                                </button>
+
+                                {showProfileMenu && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-10"
+                                            onClick={() => setShowProfileMenu(false)}
+                                        ></div>
+                                        <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                                            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user?.nama_lengkap}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                                            </div>
+                                            <Link
+                                                to="/profile"
+                                                className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                onClick={() => setShowProfileMenu(false)}
+                                            >
+                                                Profil Saya
+                                            </Link>
+                                            <Link
+                                                to="/settings"
+                                                className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                                                onClick={() => setShowProfileMenu(false)}
+                                            >
+                                                <Settings className="w-4 h-4" /> Pengaturan
+                                            </Link>
+                                            <button
+                                                onClick={() => {
+                                                    setShowProfileMenu(false);
+                                                    setShowHelp(true);
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                                            >
+                                                <BookOpen className="w-4 h-4" /> Bantuan
+                                            </button>
+                                            <div className="border-t border-gray-200 dark:border-gray-700 mt-1"></div>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                                            >
+                                                <LogOut className="w-4 h-4" /> Keluar
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -159,6 +320,8 @@ export default function DashboardLayout({ children }) {
                     {children}
                 </main>
             </div>
+            {/* Help Modal */}
+            <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
         </div>
     );
 }

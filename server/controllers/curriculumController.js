@@ -1,281 +1,293 @@
-import { CPL, CPMK, SubCPMK } from '../models/index.js';
 
-// Get all CPL
-export const getAllCPL = async (req, res) => {
+import {
+    CPL, CPMK, SubCPMK, BahanKajian, MataKuliah, Prodi
+} from '../models/index.js';
+import { Op } from 'sequelize';
+import sequelize from '../config/database.js';
+import csvParser from 'csv-parser';
+import fs from 'fs';
+
+// Helper to delete file after processing
+const cleanupFile = (path) => {
+    if (fs.existsSync(path)) fs.unlinkSync(path);
+};
+
+// ========== CPL ==========
+export const getCPLs = async (req, res) => {
     try {
-        const cpl = await CPL.findAll({
-            order: [['kode_cpl', 'ASC']],
-            attributes: ['id', 'kode_cpl', 'deskripsi', 'keterangan', 'kategori']
+        const { prodi_id } = req.user; // Assuming user is Kaprodi
+        const cpls = await CPL.findAll({
+            where: { prodi_id },
+            order: [['created_at', 'DESC']]
         });
-
-        res.json(cpl);
+        res.json(cpls);
     } catch (error) {
-        console.error('Get CPL error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
+        res.status(500).json({ message: error.message });
     }
 };
 
-// Get all CPMK
-export const getAllCPMK = async (req, res) => {
-    try {
-        const cpmk = await CPMK.findAll({
-            include: [{
-                model: CPL,
-                as: 'cpl',
-                attributes: ['id', 'kode_cpl']
-            }],
-            order: [['kode_cpmk', 'ASC']]
-        });
+export const importCPL = async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-        res.json(cpmk);
+    const results = [];
+    const errors = [];
+
+    fs.createReadStream(req.file.path)
+        .pipe(csvParser())
+        .on('data', (data) => results.push(data))
+        .on('end', async () => {
+            const t = await sequelize.transaction();
+            try {
+                let successCount = 0;
+                for (const row of results) {
+                    // Expected columns: KodeUnik, KodeProdi, Deskripsi, Kategori
+                    const { KodeUnik, KodeProdi, Deskripsi, Kategori } = row;
+
+                    if (!KodeUnik || !Deskripsi) {
+                        errors.push(`Skipping row ${KodeUnik}: Missing required fields`);
+                        continue;
+                    }
+
+                    await CPL.upsert({
+                        prodi_id: req.user.prodi_id,
+                        kode_cpl: KodeUnik,
+                        keterangan: KodeProdi,
+                        deskripsi: Deskripsi,
+                        kategori: Kategori,
+                        level: 'prodi'
+                    }, { transaction: t });
+                    successCount++;
+                }
+
+                await t.commit();
+                cleanupFile(req.file.path);
+                res.json({ message: `Import successful. ${successCount} CPLs processed.`, errors });
+            } catch (error) {
+                await t.rollback();
+                cleanupFile(req.file.path);
+                res.status(500).json({ message: 'Import failed: ' + error.message });
+            }
+        });
+};
+
+// ========== BAHAN KAJIAN ==========
+export const getBahanKajian = async (req, res) => {
+    try {
+        const { prodi_id } = req.user;
+        const bks = await BahanKajian.findAll({
+            where: { prodi_id },
+            order: [['kode_bk', 'ASC']]
+        });
+        res.json(bks);
     } catch (error) {
-        console.error('Get CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
+        res.status(500).json({ message: error.message });
     }
 };
 
-// Get all Sub-CPMK
-export const getAllSubCPMK = async (req, res) => {
-    try {
-        const subCpmk = await SubCPMK.findAll({
-            include: [{
-                model: CPMK,
-                as: 'cpmk',
-                attributes: ['id', 'kode_cpmk', 'deskripsi']
-            }],
-            order: [['kode_sub_cpmk', 'ASC']]
-        });
+export const importBahanKajian = async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-        res.json(subCpmk);
+    const results = [];
+
+    fs.createReadStream(req.file.path)
+        .pipe(csvParser())
+        .on('data', (data) => results.push(data))
+        .on('end', async () => {
+            const t = await sequelize.transaction();
+            try {
+                let successCount = 0;
+                for (const row of results) {
+                    // Expected: KodeBK, KodeProdi, Jenis, Deskripsi, BobotMin, BobotMax
+                    const { KodeBK, KodeProdi, Jenis, Deskripsi, BobotMin, BobotMax } = row;
+
+                    if (!KodeBK || !Deskripsi) continue;
+
+                    await BahanKajian.upsert({
+                        prodi_id: req.user.prodi_id,
+                        kode_bk: KodeBK,
+                        jenis: Jenis,
+                        deskripsi: Deskripsi,
+                        bobot_min: parseFloat(BobotMin) || 0,
+                        bobot_max: parseFloat(BobotMax) || 0
+                    }, { transaction: t });
+                    successCount++;
+                }
+
+                await t.commit();
+                cleanupFile(req.file.path);
+                res.json({ message: `Import successful. ${successCount} items processed.` });
+            } catch (error) {
+                await t.rollback();
+                cleanupFile(req.file.path);
+                res.status(500).json({ message: error.message });
+            }
+        });
+};
+
+// ========== CPMK (Requires MK Code) ==========
+export const importCPMK = async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    const results = [];
+
+    fs.createReadStream(req.file.path)
+        .pipe(csvParser())
+        .on('data', (data) => results.push(data))
+        .on('end', async () => {
+            const t = await sequelize.transaction();
+            try {
+                let successCount = 0;
+                for (const row of results) {
+                    // Cols: KodeMK, KodeCPMK, Deskripsi, KodeCPL
+                    const { KodeMK, KodeCPMK, Deskripsi, KodeCPL } = row;
+
+                    if (!KodeMK || !KodeCPMK) continue;
+
+                    // Find MK
+                    const mk = await MataKuliah.findOne({ where: { kode_mk: KodeMK, prodi_id: req.user.prodi_id } });
+                    if (!mk) continue;
+
+                    // Find CPL
+                    let cplId = null;
+                    if (KodeCPL) {
+                        const cpl = await CPL.findOne({ where: { kode_cpl: KodeCPL, prodi_id: req.user.prodi_id } });
+                        if (cpl) cplId = cpl.id;
+                    }
+
+                    await CPMK.upsert({
+                        mata_kuliah_id: mk.id,
+                        kode_cpmk: KodeCPMK,
+                        deskripsi: Deskripsi,
+                        cpl_id: cplId
+                    }, { transaction: t });
+                    successCount++;
+                }
+                await t.commit();
+                cleanupFile(req.file.path);
+                res.json({ message: `Import successful. ${successCount} CPMKs processed.` });
+            } catch (error) {
+                await t.rollback();
+                cleanupFile(req.file.path);
+                res.status(500).json({ message: error.message });
+            }
+        });
+};
+
+// ========== SUB-CPMK (Requires MK + CPMK Code) ==========
+export const importSubCPMK = async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    const results = [];
+
+    fs.createReadStream(req.file.path)
+        .pipe(csvParser())
+        .on('data', (data) => results.push(data))
+        .on('end', async () => {
+            const t = await sequelize.transaction();
+            try {
+                let successCount = 0;
+                for (const row of results) {
+                    // Cols: KodeMK, KodeCPMK, KodeSubCPMK, Deskripsi
+                    const { KodeMK, KodeCPMK, KodeSubCPMK, Deskripsi } = row;
+
+                    if (!KodeMK || !KodeCPMK || !KodeSubCPMK) continue;
+
+                    // Resolve Hierarchy: MK -> CPMK -> SubCPMK
+                    const mk = await MataKuliah.findOne({ where: { kode_mk: KodeMK, prodi_id: req.user.prodi_id } });
+                    if (!mk) continue;
+
+                    const cpmk = await CPMK.findOne({
+                        where: { kode_cpmk: KodeCPMK, mata_kuliah_id: mk.id }
+                    });
+                    if (!cpmk) continue;
+
+                    await SubCPMK.upsert({
+                        cpmk_id: cpmk.id,
+                        kode_sub_cpmk: KodeSubCPMK,
+                        deskripsi: Deskripsi,
+                        is_template: true
+                    }, { transaction: t });
+                    successCount++;
+                }
+                await t.commit();
+                cleanupFile(req.file.path);
+                res.json({ message: `Import successful. ${successCount} Sub-CPMKs processed.` });
+            } catch (error) {
+                await t.rollback();
+                cleanupFile(req.file.path);
+                res.status(500).json({ message: error.message });
+            }
+        });
+};
+
+// ========== MATA KULIAH ==========
+export const importMataKuliah = async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    const results = [];
+
+    fs.createReadStream(req.file.path)
+        .pipe(csvParser())
+        .on('data', (data) => results.push(data))
+        .on('end', async () => {
+            const t = await sequelize.transaction();
+            try {
+                let successCount = 0;
+                for (const row of results) {
+                    // Cols: KodeMK, NamaMK, SKS, Semester, Deskripsi
+                    const { KodeMK, NamaMK, SKS, Semester, Deskripsi } = row;
+
+                    if (!KodeMK || !NamaMK) continue;
+
+                    await MataKuliah.upsert({
+                        prodi_id: req.user.prodi_id,
+                        kode_mk: KodeMK,
+                        nama_mk: NamaMK,
+                        sks: parseInt(SKS) || 3,
+                        semester: parseInt(Semester) || 1,
+                        deskripsi: Deskripsi,
+                        scope: 'prodi',
+                        is_active: true
+                    }, { transaction: t });
+                    successCount++;
+                }
+                await t.commit();
+                cleanupFile(req.file.path);
+                res.json({ message: `Import successful. ${successCount} Mata Kuliah processed.` });
+            } catch (error) {
+                await t.rollback();
+                cleanupFile(req.file.path);
+                res.status(500).json({ message: error.message });
+            }
+        });
+};
+
+// ========== BATCH DELETE ==========
+export const deleteBatchCPMK = async (req, res) => {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) return res.status(400).json({ message: 'Invalid IDs' });
+
+    try {
+        await CPMK.destroy({
+            where: {
+                id: { [Op.in]: ids }
+            }
+        });
+        res.json({ message: `${ids.length} CPMKs deleted successfully` });
     } catch (error) {
-        console.error('Get Sub-CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
+        res.status(500).json({ message: error.message });
     }
 };
 
-// Create CPL
-export const createCPL = async (req, res) => {
+export const deleteBatchSubCPMK = async (req, res) => {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) return res.status(400).json({ message: 'Invalid IDs' });
+
     try {
-        const { kode_cpl, deskripsi, keterangan, kategori, prodi_id, pl_id } = req.body;
-
-        const cpl = await CPL.create({
-            kode_cpl,
-            deskripsi,
-            keterangan,
-            kategori,
-            prodi_id: prodi_id || req.user.prodi_id,
-            pl_id
+        await SubCPMK.destroy({
+            where: {
+                id: { [Op.in]: ids }
+            }
         });
-
-        res.status(201).json(cpl);
+        res.json({ message: `${ids.length} Sub-CPMKs deleted successfully` });
     } catch (error) {
-        console.error('Create CPL error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Create CPMK
-export const createCPMK = async (req, res) => {
-    try {
-        const { kode_cpmk, deskripsi, cpl_id, mata_kuliah_id, is_template } = req.body;
-
-        const cpmk = await CPMK.create({
-            kode_cpmk,
-            deskripsi,
-            cpl_id,
-            mata_kuliah_id,
-            is_template: is_template !== undefined ? is_template : true,
-            created_by: req.user.id
-        });
-
-        // Fetch again to include CPL
-        const created = await CPMK.findByPk(cpmk.id, {
-            include: [{ model: CPL, as: 'cpl', attributes: ['id', 'kode_cpl'] }]
-        });
-
-        res.status(201).json(created);
-    } catch (error) {
-        console.error('Create CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Update CPMK
-export const updateCPMK = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { kode_cpmk, deskripsi, cpl_id } = req.body;
-
-        const cpmk = await CPMK.findByPk(id);
-
-        if (!cpmk) {
-            return res.status(404).json({ message: 'CPMK not found' });
-        }
-
-        await cpmk.update({
-            kode_cpmk,
-            deskripsi,
-            cpl_id
-        });
-
-        // Fetch updated to include CPL
-        const updated = await CPMK.findByPk(id, {
-            include: [{ model: CPL, as: 'cpl', attributes: ['id', 'kode_cpl'] }]
-        });
-
-        res.json(updated);
-    } catch (error) {
-        console.error('Update CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Delete CPMK
-export const deleteCPMK = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const cpmk = await CPMK.findByPk(id);
-
-        if (!cpmk) {
-            return res.status(404).json({ message: 'CPMK not found' });
-        }
-
-        await cpmk.destroy();
-
-        res.json({ message: 'CPMK deleted successfully' });
-    } catch (error) {
-        console.error('Delete CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Bulk import CPL (with CSV data)
-export const bulkImportCPL = async (req, res) => {
-    try {
-        const { data } = req.body;
-
-        if (!Array.isArray(data) || data.length === 0) {
-            return res.status(400).json({ message: 'Invalid data format' });
-        }
-
-        const created = await CPL.bulkCreate(data, {
-            updateOnDuplicate: ['deskripsi', 'keterangan', 'kategori']
-        });
-
-        res.status(201).json({
-            message: `${created.length} CPL imported successfully`,
-            count: created.length
-        });
-    } catch (error) {
-        console.error('Bulk import CPL error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Update CPL
-export const updateCPL = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { kode_cpl, deskripsi, keterangan, kategori } = req.body;
-
-        const cpl = await CPL.findByPk(id);
-
-        if (!cpl) {
-            return res.status(404).json({ message: 'CPL not found' });
-        }
-
-        await cpl.update({
-            kode_cpl,
-            deskripsi,
-            keterangan,
-            kategori
-        });
-
-        res.json(cpl);
-    } catch (error) {
-        console.error('Update CPL error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Delete CPL
-export const deleteCPL = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const cpl = await CPL.findByPk(id);
-
-        if (!cpl) {
-            return res.status(404).json({ message: 'CPL not found' });
-        }
-
-        await cpl.destroy();
-
-        res.json({ message: 'CPL deleted successfully' });
-    } catch (error) {
-        console.error('Delete CPL error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Create Sub-CPMK
-export const createSubCPMK = async (req, res) => {
-    try {
-        const { cpmk_id, kode_sub_cpmk, deskripsi, indikator, bobot_nilai } = req.body;
-
-        const sub = await SubCPMK.create({
-            cpmk_id,
-            kode_sub_cpmk,
-            deskripsi,
-            indikator,
-            bobot_nilai,
-            is_template: true
-        });
-
-        const created = await SubCPMK.findByPk(sub.id, {
-            include: [{ model: CPMK, as: 'cpmk', include: [{ model: CPL, as: 'cpl' }] }]
-        });
-
-        res.status(201).json(created);
-    } catch (error) {
-        console.error('Create Sub-CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Update Sub-CPMK
-export const updateSubCPMK = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { cpmk_id, kode_sub_cpmk, deskripsi, indikator, bobot_nilai } = req.body;
-
-        const sub = await SubCPMK.findByPk(id);
-        if (!sub) return res.status(404).json({ message: 'Sub-CPMK not found' });
-
-        await sub.update({ cpmk_id, kode_sub_cpmk, deskripsi, indikator, bobot_nilai });
-
-        const updated = await SubCPMK.findByPk(id, {
-            include: [{ model: CPMK, as: 'cpmk', include: [{ model: CPL, as: 'cpl' }] }]
-        });
-
-        res.json(updated);
-    } catch (error) {
-        console.error('Update Sub-CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-};
-
-// Delete Sub-CPMK
-export const deleteSubCPMK = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const sub = await SubCPMK.findByPk(id);
-        if (!sub) return res.status(404).json({ message: 'Sub-CPMK not found' });
-
-        await sub.destroy();
-        res.json({ message: 'Sub-CPMK deleted successfully' });
-    } catch (error) {
-        console.error('Delete Sub-CPMK error:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
+        res.status(500).json({ message: error.message });
     }
 };

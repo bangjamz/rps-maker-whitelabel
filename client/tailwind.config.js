@@ -10,17 +10,17 @@ export default {
             colors: {
                 // Professional color palette - Navy & Slate theme
                 primary: {
-                    50: '#f0f4ff',
-                    100: '#e0e9ff',
-                    200: '#c7d7fe',
-                    300: '#a5b9fc',
-                    400: '#8191f8',
-                    500: '#6366f1',
-                    600: '#4f46e5',
-                    700: '#4338ca',
-                    800: '#3730a3',
-                    900: '#312e81',
-                    950: '#1e1b4b',
+                    50: '#f4f7fb',
+                    100: '#e4ebf5',
+                    200: '#c3d5ea',
+                    300: '#91b5db',
+                    400: '#588fc8',
+                    500: '#316eb1',
+                    600: '#00295f', // Main Brand Color
+                    700: '#00224f',
+                    800: '#001c40',
+                    900: '#001736',
+                    950: '#000f24',
                 },
                 accent: {
                     50: '#f0fdfa',

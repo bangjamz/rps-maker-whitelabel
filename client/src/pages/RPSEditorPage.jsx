@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronRight, BookOpen, Users, Monitor, X } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronRight, BookOpen, Users, Monitor, X, Cloud, CloudOff } from 'lucide-react';
 import { debounce } from 'lodash';
 import axios from '../lib/axios';
 import useAuthStore from '../store/useAuthStore';
@@ -15,6 +15,7 @@ export default function RPSEditorPage() {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [activeSection, setActiveSection] = useState('identitas');
+    const [lastSaved, setLastSaved] = useState(null);
 
     // --- State: Identitas MK ---
     const [courses, setCourses] = useState([]);
@@ -52,29 +53,66 @@ export default function RPSEditorPage() {
     const [rows, setRows] = useState([]);
     const [currentRPSId, setCurrentRPSId] = useState(rpsId || null);
 
-    // --- State: Additional Info ---
-    const [pustakaUtama, setPustakaUtama] = useState('');
-    const [pustakaPendukung, setPustakaPendukung] = useState('');
-    const [mediaSoftware, setMediaSoftware] = useState('');
-    const [mediaHardware, setMediaHardware] = useState('');
-    const [ambangKelulusanMhs, setAmbangKelulusanMhs] = useState(60);
-    const [ambangKelulusanMK, setAmbangKelulusanMK] = useState(60);
+    // --- Local Storage Draft Logic ---
+    const DRAFT_KEY = `rps_draft_${user?.id}_${rpsId || 'new'}`;
 
-    // Options for multi-select (max 3)
-    const metodePembelajaran = ['Kuliah', 'Responsi', 'Seminar', 'Praktikum', 'Diskusi', 'Studi Kasus', 'Problem Based Learning', 'Project Based Learning', 'Presentasi', 'Penugasan'];
-    const teknikPenilaian = ['Tes Tertulis', 'Tes Lisan', 'Observasi', 'Praktik', 'Proyek', 'Portofolio', 'Kuis', 'Tugas Individu', 'Tugas Kelompok', 'Presentasi'];
+    // Load draft on mount (only if creating new or if user explicitly wants to check drafts)
+    useEffect(() => {
+        const savedDraft = localStorage.getItem(DRAFT_KEY);
+        if (savedDraft && !rpsId) {
+            // Only auto-load for new RPS if a draft exists
+            // For existing RPS, we prioritize server data, but maybe show a banner?
+            try {
+                const parsed = JSON.parse(savedDraft);
+                const confirmLoad = window.confirm('Ditemukan draft RPS yang belum disimpan. Apakah Anda ingin melanjutkannya?');
+                if (confirmLoad) {
+                    setFormData(parsed.formData);
+                    // rows need recreation of logic/ids if needed, but simple set works
+                    setRows(parsed.rows || []);
+                    setSelectedCPLs(parsed.selectedCPLs || []);
+                    setSelectedCPMKs(parsed.selectedCPMKs || []);
+                    setDefinedSubCPMKs(parsed.definedSubCPMKs || []);
+                    console.log('Draft loaded');
+                }
+            } catch (e) {
+                console.error('Failed to parse draft', e);
+            }
+        }
+    }, [rpsId, user?.id]);
 
-    // --- Effects ---
+    // Save draft periodically
+    useEffect(() => {
+        const saveToLocal = debounce(() => {
+            if (formData.mata_kuliah_id) { // Only save if at least MK is selected
+                const draftData = {
+                    formData,
+                    rows,
+                    selectedCPLs,
+                    selectedCPMKs,
+                    definedSubCPMKs,
+                    updatedAt: new Date().toISOString()
+                };
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+                setLastSaved(new Date());
+            }
+        }, 2000);
+
+        saveToLocal();
+        return () => saveToLocal.cancel();
+    }, [formData, rows, selectedCPLs, selectedCPMKs, definedSubCPMKs, DRAFT_KEY]);
+
+    // --- Data Fetching & Effects ---
     useEffect(() => {
         fetchCourses();
     }, []);
 
     // Update semester when header changes
     useEffect(() => {
-        if (!rpsId && activeSemester) {
+        // Only update if not loaded from params/draft override
+        if (!rpsId && activeSemester && !formData.mata_kuliah_id) {
             setFormData(prev => ({ ...prev, semester: activeSemester }));
         }
-        if (!rpsId && activeYear) {
+        if (!rpsId && activeYear && !formData.mata_kuliah_id) {
             setFormData(prev => ({ ...prev, tahun_ajaran: activeYear }));
         }
     }, [activeSemester, activeYear, rpsId]);
@@ -174,13 +212,16 @@ export default function RPSEditorPage() {
                 pengembang_rps: rps.pengembang_rps || user?.nama_lengkap || '',
                 ketua_prodi: rps.ketua_prodi || ''
             });
+            if (rps.sub_cpmk_list) {
+                setDefinedSubCPMKs(rps.sub_cpmk_list);
+            }
             setCurrentRPSId(rps.id);
             if (rps.pertemuan && rps.pertemuan.length > 0) {
                 setRows(rps.pertemuan.map(p => ({
                     id: p.id || Date.now() + Math.random(),
                     minggu_ke: p.minggu_ke,
                     cpmk_id: p.cpmk_id || '',
-                    sub_cpmk_id: p.sub_cpmk_id || '',
+                    sub_cpmk_id: p.sub_cpmk_id || '', // Ensure ID is loaded
                     indikator: p.indikator || '',
                     teknik_penilaian: Array.isArray(p.teknik_penilaian) ? p.teknik_penilaian : (p.teknik_penilaian ? [p.teknik_penilaian] : []),
                     kriteria_penilaian: p.kriteria_penilaian || '',
@@ -368,7 +409,26 @@ export default function RPSEditorPage() {
     };
 
     // --- Save ---
-    const handleSaveDraft = async () => {
+    // --- Save ---
+    const handleSaveDraft = () => {
+        if (!formData.mata_kuliah_id) {
+            alert('Pilih Mata Kuliah terlebih dahulu');
+            return;
+        }
+        const draftData = {
+            formData,
+            rows,
+            selectedCPLs,
+            selectedCPMKs,
+            definedSubCPMKs,
+            updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+        setLastSaved(new Date());
+        alert('Draft berhasil disimpan di browser (Local Storage)');
+    };
+
+    const handleSaveToServer = async () => {
         if (!formData.mata_kuliah_id) {
             alert('Pilih Mata Kuliah terlebih dahulu');
             return;
@@ -376,20 +436,29 @@ export default function RPSEditorPage() {
         try {
             setLoading(true);
 
-            // If editing existing RPS, update instead of create
+            // Payload builder
+            const payload = {
+                ...formData,
+                cpl_ids: selectedCPLs,
+                cpmk_ids: selectedCPMKs // Make sure to send CPMKs too if needed by backend logic (though backend might not use it directly yet)
+            };
+
+            let saveId = currentRPSId;
+
             // If editing existing RPS, update instead of create
             if (currentRPSId) {
                 await axios.put(`/rps/dosen/${currentRPSId}/update`, {
                     deskripsi_mk: formData.deskripsi_mk,
                     rumpun_mk: formData.rumpun_mk,
                     pengembang_rps: formData.pengembang_rps,
+                    koordinator_rumpun_mk: formData.koordinator_rumpun_mk,
                     ketua_prodi: formData.ketua_prodi,
-                    cpl_ids: selectedCPLs
+                    cpl_ids: selectedCPLs,
+                    sub_cpmk_list: definedSubCPMKs // Add Sub-CPMK definitions
                 });
-                if (rows.length > 0) {
-                    await axios.post(`/rps/dosen/${currentRPSId}/pertemuan/bulk`, { pertemuan: rows });
-                }
-                alert('RPS berhasil disimpan');
+                // Note: CPMK links normally saved via bulk or separate endpoint? 
+                // Currently `updateRPS` controller only takes cpl_ids. 
+                // We'll rely on `bulkUpsertPertemuan` to link specific Sub-CPMKs which implies CPMKs.
             } else {
                 // Create new RPS
                 const res = await axios.post('/rps/dosen/create', {
@@ -399,17 +468,27 @@ export default function RPSEditorPage() {
                     deskripsi_mk: formData.deskripsi_mk,
                     rumpun_mk: formData.rumpun_mk,
                     pengembang_rps: formData.pengembang_rps,
+                    koordinator_rumpun_mk: formData.koordinator_rumpun_mk,
                     ketua_prodi: formData.ketua_prodi,
-                    cpl_ids: selectedCPLs
+                    cpl_ids: selectedCPLs,
+                    sub_cpmk_list: definedSubCPMKs // Add Sub-CPMK definitions
                 });
-                const newRpsId = res.data.rps?.id || res.data.id;
-                setCurrentRPSId(newRpsId);
-                if (rows.length > 0) {
-                    await axios.post(`/rps/dosen/${newRpsId}/pertemuan/bulk`, { pertemuan: rows });
-                }
-                alert('RPS berhasil dibuat (Draft)');
+                saveId = res.data.rps?.id || res.data.id;
+                setCurrentRPSId(saveId);
+            }
+
+            if (rows.length > 0 && saveId) {
+                await axios.post(`/rps/dosen/${saveId}/pertemuan/bulk`, { pertemuan: rows });
+            }
+
+            // Clear draft
+            localStorage.removeItem(DRAFT_KEY);
+
+            alert('RPS berhasil disimpan ke server');
+
+            if (!currentRPSId) {
                 const basePath = window.location.pathname.includes('/kaprodi/') ? '/kaprodi' : '/dosen';
-                navigate(`${basePath}/rps/${newRpsId}/edit`, { replace: true });
+                navigate(`${basePath}/rps/${saveId}/edit`, { replace: true });
             }
         } catch (error) {
             console.error('Save failed:', error);
@@ -461,6 +540,33 @@ export default function RPSEditorPage() {
                 </button>
             </div>
 
+            {/* Floating Footer for Actions */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg z-50">
+                <div className="container mx-auto flex justify-between items-center">
+                    <div className="text-sm text-gray-500">
+                        {lastSaved ? (
+                            <span className="flex items-center gap-1 text-green-600">
+                                <Cloud size={14} /> Tersimpan otomatis di browser {lastSaved.toLocaleTimeString()}
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1 text-gray-400">
+                                <CloudOff size={14} /> Belum tersimpan di browser
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={() => navigate(-1)} className="btn btn-ghost">Batal</button>
+                        <button
+                            onClick={handleSaveToServer}
+                            disabled={loading || !formData.mata_kuliah_id}
+                            className="btn btn-primary"
+                        >
+                            <Save size={18} className="mr-2" />
+                            {loading ? 'Menyimpan...' : 'Simpan ke Server'}
+                        </button>
+                    </div>
+                </div>
+            </div>
             {/* Section Tabs */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                 <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
@@ -570,168 +676,270 @@ export default function RPSEditorPage() {
 
                     {/* Section: CPL & CPMK */}
                     {activeSection === 'cpl' && (
-                        <div className="space-y-6">
-                            {/* CPL Selection - Checkbox list */}
+                        <div className="space-y-8">
+
+                            {/* 1. CPL Table */}
                             <div>
-                                <h3 className="font-bold text-lg mb-3 text-gray-900 dark:text-white">Capaian Pembelajaran Lulusan (CPL) Program Studi</h3>
-                                <p className="text-sm text-gray-500 mb-3">Centang CPL yang relevan dengan mata kuliah ini (biasanya 2-4 CPL)</p>
-                                <div className="border rounded-lg p-4 max-h-72 overflow-y-auto bg-gray-50 dark:bg-gray-900/50 space-y-2">
-                                    {availableCPLs.length === 0 ? (
-                                        <p className="text-gray-500 text-sm italic">Memuat CPL... {!formData.mata_kuliah_id && '(Pilih MK di tab Identitas)'}</p>
-                                    ) : (
-                                        availableCPLs.map(cpl => (
-                                            <label key={cpl.id} className={`flex items-start gap-3 p-3 rounded cursor-pointer border transition-colors ${selectedCPLs.includes(cpl.id)
-                                                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700'
-                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'
-                                                }`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedCPLs.includes(cpl.id)}
-                                                    onChange={() => toggleCPL(cpl.id)}
-                                                    className="mt-1 h-4 w-4"
-                                                />
-                                                <div className="flex-1">
-                                                    <span className="font-semibold text-blue-600 dark:text-blue-400">{cpl.kode}</span>
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{cpl.deskripsi}</p>
-                                                </div>
-                                            </label>
-                                        ))
-                                    )}
+                                <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">1. Capaian Pembelajaran Lulusan (CPL)</h3>
+                                <p className="text-sm text-gray-500 mb-3">Pilih CPL yang dibebankan pada mata kuliah ini.</p>
+
+                                <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead className="bg-gray-50 dark:bg-gray-700">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Kode CPL</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deskripsi</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {selectedCPLs.map(id => {
+                                                const cpl = availableCPLs.find(c => c.id === id);
+                                                if (!cpl) return null;
+                                                return (
+                                                    <tr key={id}>
+                                                        <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white align-top">{cpl.kode}</td>
+                                                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top">{cpl.deskripsi}</td>
+                                                        <td className="px-4 py-3 text-center align-top">
+                                                            <button
+                                                                onClick={() => toggleCPL(id)}
+                                                                className="text-red-500 hover:text-red-700"
+                                                                title="Hapus"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {selectedCPLs.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="3" className="px-4 py-8 text-center text-gray-400 italic">Belum ada CPL yang dipilih</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                        <tfoot className="bg-gray-50 dark:bg-gray-800/50">
+                                            <tr>
+                                                <td colSpan="3" className="px-4 py-3">
+                                                    <div className="flex gap-2">
+                                                        <select
+                                                            className="input input-sm flex-1 max-w-md"
+                                                            onChange={(e) => {
+                                                                if (e.target.value) {
+                                                                    toggleCPL(parseInt(e.target.value));
+                                                                    e.target.value = "";
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="">+ Tambah CPL...</option>
+                                                            {availableCPLs
+                                                                .filter(c => !selectedCPLs.includes(c.id))
+                                                                .map(c => (
+                                                                    <option key={c.id} value={c.id}>{c.kode} - {c.deskripsi.substring(0, 50)}...</option>
+                                                                ))}
+                                                        </select>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
                                 </div>
-                                {selectedCPLs.length > 0 && (
-                                    <p className="text-sm text-green-600 mt-2">✓ {selectedCPLs.length} CPL dipilih</p>
-                                )}
                             </div>
 
-                            {/* CPMK Editor - Only show CPMKs related to selected CPLs */}
+                            {/* 2. CPMK Table */}
                             <div>
-                                <div className="flex justify-between items-center mb-3">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-gray-900 dark:text-white">Capaian Pembelajaran Mata Kuliah (CPMK)</h3>
-                                        <p className="text-sm text-gray-500">Pilih CPMK yang akan dibebankan pada mata kuliah ini.</p>
-                                    </div>
-                                </div>
-                                <div className="space-y-4">
-                                    {selectedCPLs.length === 0 ? (
-                                        <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded text-center text-yellow-700 dark:text-yellow-400">
-                                            Silakan pilih CPL terlebih dahulu di atas.
-                                        </div>
-                                    ) : (
-                                        selectedCPLs.map(cplId => {
-                                            const cpl = availableCPLs.find(c => c.id === cplId);
-                                            if (!cpl) return null;
+                                <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">2. Capaian Pembelajaran Mata Kuliah (CPMK)</h3>
+                                <p className="text-sm text-gray-500 mb-3">Pilih CPMK turunan dari CPL terpilih. Deskripsi dan CPL Induk otomatis terisi.</p>
 
-                                            // Ensure cpmks is array
-                                            const cpmks = cpl.cpmks || [];
+                                <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead className="bg-gray-50 dark:bg-gray-700">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Kode CPMK</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deskripsi</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-48">CPL Yang Didukung</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {selectedCPMKs.map(id => {
+                                                // Find CPMK across all CPLs
+                                                const parentCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === id));
+                                                const cpmk = parentCPL?.cpmks?.find(mk => mk.id === id);
 
-                                            return (
-                                                <div key={cpl.id} className="border rounded-lg p-4 bg-white dark:bg-gray-800">
-                                                    <div className="flex justify-between items-center mb-4">
-                                                        <h4 className="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 flex-1">
-                                                            Turunan dari {cpl.kode}
-                                                            <span className="text-xs font-normal text-gray-500 ml-2 block sm:inline">{cpl.deskripsi.substring(0, 60)}...</span>
-                                                        </h4>
-                                                        <button
-                                                            onClick={() => setActiveCpl(activeCpl === cpl.id ? null : cpl.id)}
-                                                            className="btn btn-xs btn-outline ml-2"
-                                                        >
-                                                            {activeCpl === cpl.id ? 'Tutup' : 'Tambah Baru'}
-                                                        </button>
-                                                    </div>
+                                                if (!cpmk) return null;
 
-                                                    {/* Existing CPMKs Checkbox List */}
-                                                    <div className="space-y-2 mb-4">
-                                                        {cpmks.length > 0 ? (
-                                                            cpmks.map(cpmk => (
-                                                                <div key={cpmk.id} className="ml-4 border-l-2 border-gray-200 dark:border-gray-700 pl-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-750 rounded-r transition-colors">
-                                                                    <label className="flex items-start gap-3 cursor-pointer">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={selectedCPMKs.includes(cpmk.id)}
-                                                                            onChange={() => toggleCPMK(cpmk.id)}
-                                                                            className="mt-1 h-4 w-4 text-blue-600 rounded"
-                                                                        />
-                                                                        <div className="flex-1">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="font-bold text-blue-600 dark:text-blue-400">{cpmk.kode}</span>
-                                                                                {cpmk.mata_kuliah_id === formData.mata_kuliah_id && (
-                                                                                    <span className="badge badge-xs badge-info">Custom</span>
-                                                                                )}
-                                                                                {cpmk.is_template && (
-                                                                                    <span className="badge badge-xs">Template</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <p className="text-sm text-gray-700 dark:text-gray-300">{cpmk.deskripsi}</p>
-
-                                                                            {/* Sub-CPMK Visual */}
-                                                                            {cpmk.subCpmks && cpmk.subCpmks.length > 0 && (
-                                                                                <div className="mt-2 text-xs text-gray-500">
-                                                                                    <span className="font-semibold">Sub-CPMK:</span>
-                                                                                    <ul className="list-disc list-inside ml-2">
-                                                                                        {cpmk.subCpmks.map(s => (
-                                                                                            <li key={s.id}>{s.kode}: {s.deskripsi.substring(0, 50)}...</li>
-                                                                                        ))}
-                                                                                    </ul>
-                                                                                </div>
-                                                                            )}
-
-                                                                            {/* Option to Add Sub-CPMK (If CPMK is selected) */}
-                                                                            {selectedCPMKs.includes(cpmk.id) && (
-                                                                                <button
-                                                                                    onClick={(e) => { e.preventDefault(); /* TODO: Open Modal */ }}
-                                                                                    className="text-xs text-blue-500 mt-1 hover:underline"
-                                                                                >+ Tambah Sub-CPMK</button>
-                                                                            )}
-                                                                        </div>
-                                                                    </label>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-sm text-gray-400 italic ml-4">Belum ada CPMK untuk kurikulum ini.</p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Form Add New CPMK (Direct to DB) */}
-                                                    {activeCpl === cpl.id && (
-                                                        <div className="mt-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-blue-100">
-                                                            <h5 className="font-semibold text-sm mb-2 text-blue-700">Tambah CPMK Baru ke Database</h5>
-                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                                                <div>
-                                                                    <label className="text-xs font-semibold">Kode</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Misal: CPMK-01"
-                                                                        className="input input-sm w-full"
-                                                                        value={newCpmk.kode || `${cpl.kode}-`}
-                                                                        onChange={e => setNewCpmk({ ...newCpmk, kode: e.target.value })}
-                                                                    />
-                                                                </div>
-                                                                <div className="md:col-span-3">
-                                                                    <label className="text-xs font-semibold">Deskripsi</label>
-                                                                    <div className="flex gap-2">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="Deskripsi kemampuan..."
-                                                                            className="input input-sm w-full"
-                                                                            value={newCpmk.deskripsi}
-                                                                            onChange={e => setNewCpmk({ ...newCpmk, deskripsi: e.target.value })}
-                                                                        />
-                                                                        <button
-                                                                            onClick={() => handleAddCPMK(cpl.id, cpl.kode)}
-                                                                            disabled={!newCpmk.kode || !newCpmk.deskripsi}
-                                                                            className="btn btn-sm btn-primary"
-                                                                        >
-                                                                            Simpan
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
+                                                return (
+                                                    <tr key={id}>
+                                                        <td className="px-4 py-3 font-semibold text-blue-600 dark:text-blue-400 align-top">
+                                                            {cpmk.kode}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top">
+                                                            {cpmk.deskripsi}
+                                                        </td>
+                                                        <td className="px-4 py-3 align-top text-xs">
+                                                            <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded font-mono">
+                                                                {parentCPL?.kode}
+                                                            </span>
+                                                            <div className="text-[10px] text-gray-400 mt-1 leading-tight hidden xl:block">
+                                                                {parentCPL?.deskripsi}
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })
-                                    )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center align-top">
+                                                            <button
+                                                                onClick={() => toggleCPMK(id)}
+                                                                className="text-red-500 hover:text-red-700"
+                                                                title="Hapus"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {selectedCPMKs.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="4" className="px-4 py-8 text-center text-gray-400 italic">Belum ada CPMK yang dipilih</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                        <tfoot className="bg-gray-50 dark:bg-gray-800/50">
+                                            <tr>
+                                                <td colSpan="4" className="px-4 py-3">
+                                                    <div className="flex gap-2">
+                                                        <select
+                                                            className="input input-sm flex-1 max-w-md"
+                                                            onChange={(e) => {
+                                                                if (e.target.value) {
+                                                                    toggleCPMK(parseInt(e.target.value));
+                                                                    e.target.value = "";
+                                                                }
+                                                            }}
+                                                            disabled={selectedCPLs.length === 0}
+                                                        >
+                                                            <option value="">{selectedCPLs.length === 0 ? 'Pilih CPL Terlebih Dahulu' : '+ Tambah CPMK...'}</option>
+                                                            {availableCPLs
+                                                                .filter(c => selectedCPLs.includes(c.id)) // Only CPMKs from selected CPLs
+                                                                .flatMap(c => c.cpmks || [])
+                                                                .filter(mk => !selectedCPMKs.includes(mk.id))
+                                                                .map(mk => (
+                                                                    <option key={mk.id} value={mk.id}>{mk.kode} - {mk.deskripsi.substring(0, 50)}...</option>
+                                                                ))
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                {/* 3. Sub-CPMK Table */}
+                                <div>
+                                    <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">3. Sub-CPMK (Indikator Kinerja)</h3>
+                                    <p className="text-sm text-gray-500 mb-3">Definisikan Sub-CPMK yang lebih spesifik. Ini yang akan dipilih di Rencana Mingguan.</p>
+
+                                    <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Kode</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deskripsi</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-48">CPMK Induk</th>
+                                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                {definedSubCPMKs.map(sub => {
+                                                    // Find parent CPMK details
+                                                    const parentCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === parseInt(sub.cpmk_id)));
+                                                    const parentCPMK = parentCPL?.cpmks?.find(mk => mk.id === parseInt(sub.cpmk_id));
+
+                                                    return (
+                                                        <tr key={sub.id}>
+                                                            <td className="px-4 py-3 font-semibold text-purple-600 dark:text-purple-400 align-top">
+                                                                {sub.kode}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top">
+                                                                {sub.deskripsi}
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top text-xs">
+                                                                {parentCPMK ? (
+                                                                    <>
+                                                                        <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-mono block w-fit mb-1">
+                                                                            {parentCPMK.kode}
+                                                                        </span>
+                                                                        <div className="text-[10px] text-gray-400 leading-tight hidden xl:block">
+                                                                            {parentCPMK.deskripsi.substring(0, 50)}...
+                                                                        </div>
+                                                                    </>
+                                                                ) : <span className="text-red-500 italic">Induk terhapus</span>}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center align-top">
+                                                                <button
+                                                                    onClick={() => handleDeleteSubCPMK(sub.id)}
+                                                                    className="text-red-500 hover:text-red-700"
+                                                                    title="Hapus"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {definedSubCPMKs.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="4" className="px-4 py-8 text-center text-gray-400 italic">Belum ada Sub-CPMK yang didefinisikan</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                            <tfoot className="bg-gray-50 dark:bg-gray-800/50">
+                                                <tr>
+                                                    <td className="px-4 py-3 align-top">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Kode (ex: L1)"
+                                                            className="input input-sm w-full"
+                                                            value={newSubCpmk.kode}
+                                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, kode: e.target.value })}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 align-top">
+                                                        <textarea
+                                                            placeholder="Deskripsi Sub-CPMK..."
+                                                            className="input input-sm w-full resize-none h-20 leading-tight py-2"
+                                                            value={newSubCpmk.deskripsi}
+                                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, deskripsi: e.target.value })}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 align-top">
+                                                        <select
+                                                            className="select select-sm w-full"
+                                                            value={newSubCpmk.cpmk_id}
+                                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, cpmk_id: e.target.value })}
+                                                            disabled={selectedCPMKs.length === 0}
+                                                        >
+                                                            <option value="">Pilih CPMK Induk...</option>
+                                                            {selectedCPMKs.map(id => {
+                                                                const parentCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === id));
+                                                                const mk = parentCPL?.cpmks?.find(m => m.id === id);
+                                                                if (!mk) return null;
+                                                                return <option key={id} value={id}>{mk.kode}</option>
+                                                            })}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center align-top">
+                                                        <button
+                                                            onClick={handleAddSubCPMKLocal}
+                                                            className="btn btn-sm btn-primary w-full"
+                                                            disabled={!newSubCpmk.kode || !newSubCpmk.deskripsi || !newSubCpmk.cpmk_id}
+                                                        >
+                                                            <Plus size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -744,115 +952,208 @@ export default function RPSEditorPage() {
                                 <div>
                                     <h3 className="font-bold text-lg text-gray-900 dark:text-white">Rencana Pembelajaran Mingguan</h3>
                                     <p className="text-sm text-gray-500">
-                                        {rows.length} pertemuan |
+                                        Rencanakan pertemuan mingguan atau kelompokkan pertemuan (contoh Minggu: "1-2").
+                                        <br />
                                         Total Bobot: <span className={totalBobot === 100 ? 'text-green-600 font-bold' : 'text-red-500 font-bold'}>{totalBobot}%</span>
                                         {totalBobot !== 100 && <span className="text-red-500"> (Harus 100%)</span>}
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={addWeek} className="btn btn-outline btn-sm">
-                                        <Plus size={16} className="mr-1" /> Tambah Minggu
+                                        <Plus size={16} className="mr-1" /> Tambah Baris
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="overflow-x-auto border rounded-lg">
+                            <div className="overflow-x-auto border rounded-lg bg-white dark:bg-gray-800">
                                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                                     <thead className="bg-gray-100 dark:bg-gray-700">
                                         <tr>
-                                            <th className="px-2 py-3 text-center font-semibold w-14">Mg</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[100px]">CPMK</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[140px]">SubCPMK</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[140px]">Indikator</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[140px]">Penilaian (maks 3)</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[140px]">Materi</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[140px]">Metode (maks 3)</th>
-                                            <th className="px-2 py-3 text-center font-semibold w-20">Bentuk</th>
-                                            <th className="px-2 py-3 text-center font-semibold w-14">%</th>
-                                            <th className="px-2 py-3 w-10"></th>
+                                            <th className="px-2 py-3 text-center font-semibold w-16">Mg</th>
+                                            <th className="px-2 py-3 text-left font-semibold min-w-[100px] w-24">CPMK</th>
+                                            <th className="px-2 py-3 text-left font-semibold min-w-[200px]">Sub-CPMK</th>
+                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Indikator</th>
+                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Kriteria & Penilaian</th>
+                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Materi</th>
+                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Metode</th>
+                                            <th className="px-2 py-3 text-center font-semibold w-16">Bentuk</th>
+                                            <th className="px-2 py-3 text-center font-semibold w-12">%</th>
+                                            <th className="px-2 py-3 w-8"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                        {rows.map((row, index) => (
-                                            <tr key={row.id} className={row.is_uts || row.is_uas ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}>
-                                                <td className="px-2 py-2 text-center">
-                                                    <span className="font-bold text-gray-500">{row.minggu_ke}</span>
-                                                    {row.is_uts && <span className="block text-xs text-yellow-600">UTS</span>}
-                                                    {row.is_uas && <span className="block text-xs text-yellow-600">UAS</span>}
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <select value={row.cpmk_id} onChange={e => updateRow(index, 'cpmk_id', e.target.value)} className="w-full px-1 py-1 border rounded text-xs dark:bg-gray-800">
-                                                        <option value="">-</option>
-                                                        {availableCPLs.flatMap(c => c.cpmks || []).filter(c => selectedCPMKs.includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.kode}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <select value={row.sub_cpmk_id} onChange={e => updateRow(index, 'sub_cpmk_id', e.target.value)} className="w-full px-1 py-1 border rounded text-xs dark:bg-gray-800">
-                                                        <option value="">-</option>
-                                                        {(() => {
-                                                            const allCpmks = availableCPLs.flatMap(c => c.cpmks || []);
-                                                            const selectedCpmk = allCpmks.find(c => c.id == row.cpmk_id);
-                                                            const subs = selectedCpmk ? (selectedCpmk.subCpmks || []) : [];
-                                                            return subs.map(s => (
-                                                                <option key={s.id} value={s.id}>{s.kode}</option>
-                                                            ));
-                                                        })()}
-                                                    </select>
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <textarea value={row.indikator} onChange={e => updateRow(index, 'indikator', e.target.value)} className="w-full px-1 py-1 border rounded text-xs dark:bg-gray-800 resize-none" rows="2" />
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {teknikPenilaian.slice(0, 6).map(t => (
-                                                            <label key={t} className={`text-xs px-1 py-0.5 rounded cursor-pointer ${(row.teknik_penilaian || []).includes(t) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900' : 'bg-gray-100 dark:bg-gray-700'
+                                        {rows.map((row, index) => {
+                                            // Handle case where id might be string vs number
+                                            const selectedSub = definedSubCPMKs.find(s => String(s.id) === String(row.sub_cpmk_id));
+
+                                            // Parent Resolution
+                                            let parentCPMKCode = '-';
+
+                                            if (selectedSub) {
+                                                const pCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === parseInt(selectedSub.cpmk_id)));
+                                                const pCPMK = pCPL?.cpmks?.find(mk => mk.id === parseInt(selectedSub.cpmk_id));
+                                                if (pCPMK) parentCPMKCode = pCPMK.kode;
+                                            }
+
+                                            return (
+                                                <tr key={row.id} className={row.is_uts || row.is_uas ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-gray-50 dark:hover://bg-gray-700/50'}>
+                                                    {/* Minggu Ke (Editable) */}
+                                                    <td className="px-2 py-2 text-center align-top">
+                                                        <input
+                                                            type="text"
+                                                            value={row.minggu_ke}
+                                                            onChange={e => updateRow(index, 'minggu_ke', e.target.value)}
+                                                            className="w-full text-center border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none bg-transparent font-bold text-gray-500"
+                                                        />
+                                                        {row.is_uts && <span className="block text-[10px] font-bold text-yellow-600 uppercase mt-1">UTS</span>}
+                                                        {row.is_uas && <span className="block text-[10px] font-bold text-yellow-600 uppercase mt-1">UAS</span>}
+                                                    </td>
+
+                                                    {/* CPMK (Read Only) */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <div className="px-2 py-1.5 bg-gray-50 dark:bg-gray-700 rounded text-xs font-mono text-center border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                                                            {parentCPMKCode}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Sub-CPMK Selection */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <select
+                                                            value={row.sub_cpmk_id || ''}
+                                                            onChange={e => {
+                                                                const subId = e.target.value;
+                                                                const sub = definedSubCPMKs.find(s => String(s.id) === String(subId));
+
+                                                                const newRow = { ...row, sub_cpmk_id: subId };
+                                                                if (sub) {
+                                                                    newRow.cpmk_id = sub.cpmk_id;
+                                                                } else {
+                                                                    newRow.cpmk_id = '';
+                                                                }
+
+                                                                const newRows = [...rows];
+                                                                newRows[index] = newRow;
+                                                                setRows(newRows);
+                                                            }}
+                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 font-medium"
+                                                        >
+                                                            <option value="">- Pilih Sub-CPMK -</option>
+                                                            {definedSubCPMKs.map(sub => (
+                                                                <option key={sub.id} value={sub.id}>{sub.kode} - {sub.deskripsi.substring(0, 30)}...</option>
+                                                            ))}
+                                                        </select>
+                                                        {selectedSub && (
+                                                            <div className="mt-1 text-[10px] text-gray-400 italic leading-tight">
+                                                                {selectedSub.deskripsi}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Indikator */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <textarea
+                                                            value={row.indikator}
+                                                            onChange={e => updateRow(index, 'indikator', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 resize-none h-24"
+                                                            placeholder="Indikator..."
+                                                        />
+                                                    </td>
+
+                                                    {/* Kriteria & Penilaian */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <textarea
+                                                            value={row.kriteria_penilaian}
+                                                            onChange={e => updateRow(index, 'kriteria_penilaian', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 resize-none h-24 mb-1"
+                                                            placeholder="Kriteria..."
+                                                        />
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {teknikPenilaian.slice(0, 4).map(t => (
+                                                                <label key={t} className={`text-[10px] px-1 py-0.5 rounded cursor-pointer border ${(row.teknik_penilaian || []).includes(t)
+                                                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30'
+                                                                    : 'bg-white border-gray-200 text-gray-500'
+                                                                    }`}>
+                                                                    <input type="checkbox" checked={(row.teknik_penilaian || []).includes(t)} onChange={() => toggleMultiSelect(index, 'teknik_penilaian', t, 3)} className="hidden" />
+                                                                    {t.split(' ')[0]}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Materi */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <textarea
+                                                            value={row.materi}
+                                                            onChange={e => updateRow(index, 'materi', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 resize-none h-24"
+                                                            placeholder={row.is_uts ? "Materi UTS" : row.is_uas ? "Materi UAS" : "Materi..."}
+                                                        />
+                                                    </td>
+
+                                                    {/* Metode */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <div className="flex flex-col gap-1">
+                                                            {metodePembelajaran.slice(0, 5).map(m => (
+                                                                <label key={m} className={`flex items-center gap-1.5 text-[10px] px-1.5 py-1 rounded cursor-pointer border ${(row.metode_pembelajaran || []).includes(m)
+                                                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30'
+                                                                    : 'bg-white border-gray-200 text-gray-500'
+                                                                    }`}>
+                                                                    <input type="checkbox" checked={(row.metode_pembelajaran || []).includes(m)} onChange={() => toggleMultiSelect(index, 'metode_pembelajaran', m, 3)} className="h-3 w-3" />
+                                                                    {m}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Bentuk (L/D) */}
+                                                    <td className="px-2 py-2 text-center align-top">
+                                                        <div className="flex flex-col gap-1 justify-center items-center h-full">
+                                                            <label className={`w-8 h-8 flex items-center justify-center rounded border cursor-pointer ${row.bentuk_pembelajaran?.includes('luring') ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-400 border-gray-200'
                                                                 }`}>
-                                                                <input type="checkbox" checked={(row.teknik_penilaian || []).includes(t)} onChange={() => toggleMultiSelect(index, 'teknik_penilaian', t, 3)} className="hidden" />
-                                                                {t.split(' ')[0]}
+                                                                <input type="checkbox" checked={row.bentuk_pembelajaran?.includes('luring')} onChange={() => toggleBentukPembelajaran(index, 'luring')} className="hidden" />
+                                                                <span className="font-bold text-xs">L</span>
                                                             </label>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <textarea value={row.materi} onChange={e => updateRow(index, 'materi', e.target.value)} className="w-full px-1 py-1 border rounded text-xs dark:bg-gray-800 resize-none" rows="2" />
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {metodePembelajaran.slice(0, 6).map(m => (
-                                                            <label key={m} className={`text-xs px-1 py-0.5 rounded cursor-pointer ${(row.metode_pembelajaran || []).includes(m) ? 'bg-green-100 text-green-700 dark:bg-green-900' : 'bg-gray-100 dark:bg-gray-700'
+                                                            <label className={`w-8 h-8 flex items-center justify-center rounded border cursor-pointer ${row.bentuk_pembelajaran?.includes('daring') ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-400 border-gray-200'
                                                                 }`}>
-                                                                <input type="checkbox" checked={(row.metode_pembelajaran || []).includes(m)} onChange={() => toggleMultiSelect(index, 'metode_pembelajaran', m, 3)} className="hidden" />
-                                                                {m.split(' ')[0]}
+                                                                <input type="checkbox" checked={row.bentuk_pembelajaran?.includes('daring')} onChange={() => toggleBentukPembelajaran(index, 'daring')} className="hidden" />
+                                                                <span className="font-bold text-xs">D</span>
                                                             </label>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <div className="flex flex-col gap-0.5 text-xs">
-                                                        <label className="flex items-center gap-1 cursor-pointer">
-                                                            <input type="checkbox" checked={row.bentuk_pembelajaran?.includes('luring')} onChange={() => toggleBentukPembelajaran(index, 'luring')} className="h-3 w-3" />
-                                                            L
-                                                        </label>
-                                                        <label className="flex items-center gap-1 cursor-pointer">
-                                                            <input type="checkbox" checked={row.bentuk_pembelajaran?.includes('daring')} onChange={() => toggleBentukPembelajaran(index, 'daring')} className="h-3 w-3" />
-                                                            D
-                                                        </label>
-                                                    </div>
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <input type="number" min="0" max="100" value={row.bobot_penilaian} onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)} className="w-full px-1 py-1 border rounded text-xs text-center dark:bg-gray-800" />
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <button onClick={() => removeWeek(index)} disabled={row.is_uts || row.is_uas} className="text-red-400 hover:text-red-600 disabled:opacity-30" title="Hapus Minggu">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Bobot */}
+                                                    <td className="px-2 py-2 align-top">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={row.bobot_penilaian}
+                                                            onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)}
+                                                            className="w-full px-1 py-1 border rounded text-xs text-center dark:bg-gray-800"
+                                                        />
+                                                    </td>
+
+                                                    {/* Actions */}
+                                                    <td className="px-2 py-2 align-top text-center">
+                                                        <button
+                                                            onClick={() => removeWeek(index)}
+                                                            disabled={row.is_uts || row.is_uas}
+                                                            className="text-gray-400 hover:text-red-600 disabled:opacity-20 transition-colors p-1"
+                                                            title="Hapus Baris"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="text-xs text-gray-500">L = Luring (Tatap Muka), D = Daring (Online)</p>
+                            <div className="flex gap-4 text-xs text-gray-500">
+                                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-800 rounded-sm"></span> L = Luring (Tatap Muka)</span>
+                                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-600 rounded-sm"></span> D = Daring (Online)</span>
+                            </div>
                         </div>
                     )}
 

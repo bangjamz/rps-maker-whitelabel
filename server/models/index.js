@@ -26,6 +26,8 @@ import StudentGrade from './StudentGrade.js';
 import FinalGrade from './FinalGrade.js';
 import Attendance from './Attendance.js';
 import Enrollment from './Enrollment.js';
+import Notification from './Notification.js';
+import AcademicYear from './AcademicYear.js';
 
 // Define associations
 
@@ -108,6 +110,11 @@ SubCPMK.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
 User.hasMany(CPMK, { foreignKey: 'created_by', as: 'created_cpmk' });
 CPMK.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
+
+// Prodi <-> Bahan Kajian
+Prodi.hasMany(BahanKajian, { foreignKey: 'prodi_id', as: 'bahan_kajian' });
+BahanKajian.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+
 // Mata Kuliah <-> Bahan Kajian (many-to-many via junction table)
 MataKuliah.belongsToMany(BahanKajian, {
     through: MKBahanKajian,
@@ -121,6 +128,7 @@ BahanKajian.belongsToMany(MataKuliah, {
     otherKey: 'mata_kuliah_id',
     as: 'mata_kuliah'
 });
+
 
 // ========== DOSEN ASSIGNMENT ==========
 // DosenAssignment relationships
@@ -265,6 +273,10 @@ NilaiMahasiswa.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
 SubCPMK.hasMany(NilaiMahasiswa, { foreignKey: 'sub_cpmk_id', as: 'nilai' });
 NilaiMahasiswa.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'sub_cpmk' });
 
+// ========== NOTIFICATIONS ==========
+User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
+Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 // Export all models
 export {
     User,
@@ -293,5 +305,7 @@ export {
     StudentGrade,
     FinalGrade,
     Attendance,
-    Enrollment
+    Enrollment,
+    Notification,
+    AcademicYear
 };

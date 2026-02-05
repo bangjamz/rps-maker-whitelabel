@@ -59,6 +59,36 @@ const User = sequelize.define('User', {
         allowNull: true,
         comment: 'Nomor telepon/HP'
     },
+    nuptk: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        comment: 'NUPTK (Nomor Unik Pendidik dan Tenaga Kependidikan)'
+    },
+    jabatan: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: 'Jabatan struktural atau fungsional'
+    },
+    homebase: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: 'Homebase program studi atau unit'
+    },
+    status_kepegawaian: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: 'Status kepegawaian (DTPS, DTPT, Dosen)'
+    },
+    foto_profil: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: 'URL/Path foto profil'
+    },
+    cover_image: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: 'URL/Path cover image (Notion style)'
+    },
     is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true

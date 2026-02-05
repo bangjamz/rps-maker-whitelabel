@@ -15,6 +15,11 @@ const RPSPertemuan = sequelize.define('RPSPertemuan', {
         type: DataTypes.INTEGER,
         allowNull: false
     },
+    sub_cpmk_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'ID linking to RPS.sub_cpmk_list'
+    },
     sub_cpmk: {
         type: DataTypes.TEXT,
         allowNull: true,

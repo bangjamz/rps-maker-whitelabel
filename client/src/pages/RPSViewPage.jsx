@@ -4,42 +4,66 @@ import axios from '../lib/axios';
 import { exportRPSToPDF } from '../utils/rpsExport';
 
 export default function RPSViewPage() {
-    const { courseId } = useParams();
+    const { courseId, rpsId } = useParams(); // Get rpsId if available
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [rpsData, setRpsData] = useState(null);
-    const [existingRPS, setExistingRPS] = useState(null);  // Store existing RPS if found
+    const [existingRPS, setExistingRPS] = useState(null);
     const [course, setCourse] = useState(null);
     const [editMode, setEditMode] = useState(false);
 
     useEffect(() => {
         loadRPSData();
-    }, [courseId]);
+    }, [courseId, rpsId]);
 
     const loadRPSData = async () => {
         setLoading(true);
         try {
-            // Fetch course info
-            const courseResponse = await axios.get(`/courses/${courseId}`);
-            setCourse(courseResponse.data);
+            let rps = null;
 
-            // Try to fetch existing RPS for this course
-            try {
-                const rpsResponse = await axios.get(`/rps/by-course/${courseId}`);
-                if (rpsResponse.data && rpsResponse.data.id) {
-                    setExistingRPS(rpsResponse.data);
-                    setRpsData(rpsResponse.data);
+            // Strategy 1: Load by RPS ID (Specific Version)
+            if (rpsId) {
+                const rpsResponse = await axios.get(`/rps/${rpsId}`);
+                rps = rpsResponse.data;
+                setExistingRPS(rps);
+                setRpsData(rps);
+
+                // If we loaded by RPS ID, we might need to fetch course info from the RPS data or separate call
+                if (rps.mata_kuliah) {
+                    setCourse(rps.mata_kuliah);
+                } else if (courseId) {
+                    const courseResponse = await axios.get(`/courses/${courseId}`);
+                    setCourse(courseResponse.data);
                 }
-            } catch (rpsError) {
-                // No RPS exists for this course yet - that's OK
-                console.log('No existing RPS for this course');
+            }
+            // Strategy 2: Load by Course ID (Latest Version - Legacy/Fallback)
+            else if (courseId) {
+                // Fetch course info
+                const courseResponse = await axios.get(`/courses/${courseId}`);
+                setCourse(courseResponse.data);
+
+                // Try to fetch existing RPS for this course
+                try {
+                    const rpsResponse = await axios.get(`/rps/by-course/${courseId}`);
+                    if (rpsResponse.data && rpsResponse.data.id) {
+                        setExistingRPS(rpsResponse.data);
+                        setRpsData(rpsResponse.data);
+                    }
+                } catch (rpsError) {
+                    console.log('No existing RPS for this course');
+                }
             }
 
-            // Also fetch CPL/CPMK for display
-            const cplResponse = await axios.get('/curriculum/cpl');
-            const cpmkResponse = await axios.get('/curriculum/cpmk');
+            // Also fetch CPL/CPMK for display (only if we need them for empty state or enhancement?)
+            // If we have RPS Data, we might not need this if the RPS object (from /rps/:id) has inclusions.
+            // But existing code uses `rpsData.cpl` which might come from standard curriculum if new?
+            // Existing `RPSViewPage` logic for "Create New" view seemed to rely on this.
+            // But here we are mostly Viewing Existing.
 
-            if (!existingRPS) {
+            // If we didn't find RPS, load "Template/Empty" data (Only relevant for CourseId path)
+            if (!rps && !rpsId && !existingRPS) { // Added !existingRPS to ensure it only runs if no RPS was found by courseId either
+                const cplResponse = await axios.get('/curriculum/cpl');
+                const cpmkResponse = await axios.get('/curriculum/cpmk');
                 setRpsData({
                     cpl: cplResponse.data.slice(0, 3),
                     cpmk: cpmkResponse.data.slice(0, 5),
@@ -93,10 +117,10 @@ export default function RPSViewPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-6">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-6 print:p-0 print:bg-white">
+            <div className="max-w-[210mm] mx-auto print:max-w-none"> {/* A4 Width approx */}
                 {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 print:hidden">
                     <button onClick={() => navigate(-1)} className="btn btn-ghost">
                         ← Kembali
                     </button>
@@ -110,163 +134,192 @@ export default function RPSViewPage() {
                     </div>
                 </div>
 
-                {/* RPS Document - Responsive Container */}
-                <div className="bg-white dark:bg-gray-900 shadow-lg rounded-lg overflow-hidden">
-                    {/* Header with Logo */}
-                    <div className="border-b-2 border-gray-900 dark:border-gray-700 p-4 md:p-8">
-                        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-                            <img
-                                src="/logo-mahardika.jpg"
-                                alt="Logo Institut Mahardika"
-                                className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0"
-                            />
-                            <div className="flex-1 text-center">
-                                <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white mb-1">
-                                    RENCANA PEMBELAJARAN SEMESTER
-                                </h1>
-                                <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white mb-1">
-                                    PROGRAM STUDI S1 INFORMATIKA
-                                </h2>
-                                <h3 className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-300 mb-1">
-                                    FAKULTAS TEKNIK
-                                </h3>
-                                <h3 className="text-sm md:text-base font-medium text-gray-800 dark:text-gray-300">
-                                    INSTITUT TEKNOLOGI DAN KESEHATAN MAHARDIKA
-                                </h3>
-                            </div>
-                        </div>
+                {/* RPS Document */}
+                <div className="bg-white text-black shadow-lg print:shadow-none p-8 md:p-10 print:p-0 text-[12px] leading-tight font-serif">
+
+                    {/* Header Table */}
+                    <table className="w-full border border-black mb-4">
+                        <tbody>
+                            <tr>
+                                <td className="border border-black p-2 w-24 text-center align-middle">
+                                    <img
+                                        src="/logo-mahardika.jpg"
+                                        alt="Logo"
+                                        className="w-20 h-20 object-contain mx-auto"
+                                    />
+                                </td>
+                                <td className="border border-black p-2 text-center align-middle">
+                                    <h1 className="font-bold text-lg">RENCANA PEMBELAJARAN SEMESTER</h1>
+                                    <h2 className="font-bold text-base">PROGRAM STUDI S1 INFORMATIKA</h2>
+                                    <h3 className="font-bold">FAKULTAS TEKNIK</h3>
+                                    <h3 className="font-bold">INSTITUT TEKNOLOGI DAN KESEHATAN MAHARDIKA</h3>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* Identitas Table */}
+                    <table className="w-full border border-black mb-px">
+                        <tbody>
+                            <tr className="bg-gray-200 print:bg-gray-200">
+                                <td className="border border-black p-1 font-bold w-[15%]">MATA KULIAH</td>
+                                <td className="border border-black p-1 font-bold w-[10%]">KODE MK</td>
+                                <td className="border border-black p-1 font-bold w-[15%]">RUMPUN MK</td>
+                                <td className="border border-black p-1 font-bold w-[10%]">BOBOT (SKS)</td>
+                                <td className="border border-black p-1 font-bold w-[10%]">SEMESTER</td>
+                                <td className="border border-black p-1 font-bold w-[15%]">TGL PENYUSUNAN</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-1">{course?.nama_mk}</td>
+                                <td className="border border-black p-1">{course?.kode_mk}</td>
+                                <td className="border border-black p-1">{rpsData?.rumpun_mk || '-'}</td>
+                                <td className="border border-black p-1">
+                                    T: {JSON.parse(JSON.stringify(rpsData?.bobot_sks || {}))?.t || course?.sks || 0} P: {JSON.parse(JSON.stringify(rpsData?.bobot_sks || {}))?.p || 0}
+                                </td>
+                                <td className="border border-black p-1">{rpsData?.semester || course?.semester}</td>
+                                <td className="border border-black p-1">{rpsData?.updated_at ? new Date(rpsData.updated_at).toLocaleDateString('id-ID') : '-'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* Otoritas Table */}
+                    <table className="w-full border border-black mb-4">
+                        <tbody>
+                            <tr className="bg-gray-200 print:bg-gray-200">
+                                <td className="border border-black p-1 font-bold w-[20%] align-middle" rowSpan="2">
+                                    OTORISASI / PENGESAHAN
+                                </td>
+                                <td className="border border-black p-1 font-bold w-[26%] text-center">Pengembang RPS</td>
+                                <td className="border border-black p-1 font-bold w-[26%] text-center">Koordinator Rumpun MK</td>
+                                <td className="border border-black p-1 font-bold w-[28%] text-center">Ketua Program Studi</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-4 text-center align-bottom h-24">
+                                    <div className="font-bold underline mb-1">{rpsData?.pengembang_rps || rpsData?.dosen?.nama_lengkap || '(...................)'}</div>
+                                </td>
+                                <td className="border border-black p-4 text-center align-bottom h-24">
+                                    <div className="font-bold underline mb-1">{rpsData?.koordinator_rumpun_mk || '(...................)'}</div>
+                                </td>
+                                <td className="border border-black p-4 text-center align-bottom h-24">
+                                    <div className="font-bold underline mb-1">{rpsData?.ketua_prodi || '(...................)'}</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* CPMK / CPL Section */}
+                    <table className="w-full border border-black mb-4">
+                        <tbody>
+                            {/* CPL */}
+                            <tr>
+                                <td className="border border-black p-1 font-bold align-top bg-gray-100" colSpan="2">
+                                    Capaian Pembelajaran Lulusan (CPL)
+                                </td>
+                            </tr>
+                            {rpsData?.cpl?.map((cpl) => (
+                                <tr key={cpl.id}>
+                                    <td className="border border-black p-1 w-[15%] align-top">{cpl.kode_cpl}</td>
+                                    <td className="border border-black p-1 align-top">{cpl.deskripsi}</td>
+                                </tr>
+                            )) || <tr><td colSpan="2" className="border border-black p-1 text-center">-</td></tr>}
+
+                            {/* CPMK */}
+                            <tr>
+                                <td className="border border-black p-1 font-bold align-top bg-gray-100" colSpan="2">
+                                    Capaian Pembelajaran Mata Kuliah (CPMK)
+                                </td>
+                            </tr>
+                            {rpsData?.cpmk?.map((cpmk) => (
+                                <tr key={cpmk.id}>
+                                    <td className="border border-black p-1 w-[15%] align-top">{cpmk.kode_cpmk}</td>
+                                    <td className="border border-black p-1 align-top">{cpmk.deskripsi}</td>
+                                </tr>
+                            )) || <tr><td colSpan="2" className="border border-black p-1 text-center">-</td></tr>}
+                        </tbody>
+                    </table>
+
+                    {/* Deskripsi MK */}
+                    <table className="w-full border border-black mb-4">
+                        <tbody>
+                            <tr>
+                                <td className="border border-black p-1 font-bold w-[15%] bg-gray-100 align-top">Deskripsi Singkat MK</td>
+                                <td className="border border-black p-1 align-top whitespace-pre-line">{rpsData?.deskripsi_mk || '-'}</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-1 font-bold w-[15%] bg-gray-100 align-top">Bahan Kajian / Materi</td>
+                                <td className="border border-black p-1 align-top">
+                                    {/* Aggregate Materi from Pertemuan if not explicitly stored elsewhere, or add field later */}
+                                    {rpsData?.pertemuan?.map(p => p.materi).filter(Boolean).join(', ') || '-'}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-1 font-bold w-[15%] bg-gray-100 align-top">Daftar Referensi</td>
+                                <td className="border border-black p-1 align-top whitespace-pre-line">{rpsData?.referensi || '-'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* Weekly Plan */}
+                    <div className="mb-4">
+                        <h3 className="font-bold mb-2">Rencana Pembelajaran Mingguan</h3>
+                        <table className="w-full border border-black text-[11px]">
+                            <thead className="bg-gray-200 text-center">
+                                <tr>
+                                    <th className="border border-black p-1 w-8">Mg Ke-</th>
+                                    <th className="border border-black p-1 w-[20%]">Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)</th>
+                                    <th className="border border-black p-1 w-[15%]">Indikator Penilaian</th>
+                                    <th className="border border-black p-1 w-[25%]">Bentuk Pembelajaran, Metode, Penugasan, & Estimasi Waktu</th>
+                                    <th className="border border-black p-1">Materi Pembelajaran</th>
+                                    <th className="border border-black p-1 w-10">Bobot (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((week) => {
+                                    // Find encounter data
+                                    const pertemuan = rpsData?.pertemuan?.find(p => p.minggu_ke === week);
+
+                                    if (week === 8) {
+                                        return (
+                                            <tr key={week} className="bg-gray-100 font-bold text-center">
+                                                <td className="border border-black p-1">8</td>
+                                                <td className="border border-black p-1" colSpan="5">EVALUASI TENGAH SEMESTER (ETS) / UTS</td>
+                                            </tr>
+                                        )
+                                    }
+                                    if (week === 16) {
+                                        return (
+                                            <tr key={week} className="bg-gray-100 font-bold text-center">
+                                                <td className="border border-black p-1">16</td>
+                                                <td className="border border-black p-1" colSpan="5">EVALUASI AKHIR SEMESTER (EAS) / UAS</td>
+                                            </tr>
+                                        )
+                                    }
+
+                                    return (
+                                        <tr key={week}>
+                                            <td className="border border-black p-1 text-center font-bold align-top">{week}</td>
+                                            <td className="border border-black p-1 align-top whitespace-pre-line">{pertemuan?.sub_cpmk || '-'}</td>
+                                            <td className="border border-black p-1 align-top whitespace-pre-line">{pertemuan?.indikator || '-'}</td>
+                                            <td className="border border-black p-1 align-top">
+                                                <div className="mb-1">
+                                                    <span className="font-semibold">Bentuk:</span> {pertemuan?.bentuk_pembelajaran ? (Array.isArray(pertemuan.bentuk_pembelajaran) ? pertemuan.bentuk_pembelajaran.join(', ') : pertemuan.bentuk_pembelajaran) : '-'}
+                                                </div>
+                                                <div className="mb-1">
+                                                    <span className="font-semibold">Metode:</span> {pertemuan?.metode_pembelajaran ? (Array.isArray(JSON.parse(JSON.stringify(pertemuan.metode_pembelajaran))) ? JSON.parse(JSON.stringify(pertemuan.metode_pembelajaran)).join(', ') : pertemuan.metode_pembelajaran) : '-'}
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold">Luring/Daring:</span> {pertemuan?.link_daring ? 'Daring' : 'Luring'}
+                                                </div>
+                                            </td>
+                                            <td className="border border-black p-1 align-top whitespace-pre-line">{pertemuan?.materi || '-'}</td>
+                                            <td className="border border-black p-1 text-center align-top">{pertemuan?.bobot_penilaian || 0}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
 
-                    {/* Tables Container with Horizontal Scroll */}
-                    <div className="p-4 md:p-6 space-y-4">
-
-                        {/* Identitas MK */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[800px] border border-gray-900 dark:border-gray-700 text-sm">
-                                <tbody>
-                                    <tr>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 font-semibold bg-gray-100 dark:bg-gray-800 w-40">
-                                            Identitas MK
-                                        </td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 font-semibold w-28">Nama MK</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2">{course?.nama_mk || '-'}</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 font-semibold w-28">Kode MK</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 w-28">{course?.kode_mk || '-'}</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 font-semibold w-28">SKS</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 w-20">{course?.sks || 0}</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 font-semibold w-28">Semester</td>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 w-20">{course?.semester || '-'}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="border border-gray-900 dark:border-gray-700 p-2 font-semibold bg-gray-100 dark:bg-gray-800">
-                                            Deskripsi MK
-                                        </td>
-                                        <td colSpan="8" className="border border-gray-900 dark:border-gray-700 p-2">
-                                            Mata kuliah ini memberikan pemahaman tentang...
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* CPL */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px] border border-gray-900 dark:border-gray-700 text-sm">
-                                <thead>
-                                    <tr className="bg-gray-50 dark:bg-gray-850">
-                                        <th colSpan="2" className="border border-gray-900 dark:border-gray-700 p-2 font-semibold text-left">
-                                            Capaian Pembelajaran Lulusan (CPL)
-                                        </th>
-                                    </tr>
-                                    <tr className="bg-gray-50 dark:bg-gray-850">
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-32">Kode CPL</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2">Deskripsi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rpsData?.cpl?.map((cpl) => (
-                                        <tr key={cpl.id}>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">{cpl.kode_cpl}</td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">{cpl.deskripsi}</td>
-                                        </tr>
-                                    )) || (
-                                            <tr>
-                                                <td colSpan="2" className="border border-gray-900 dark:border-gray-700 p-4 text-center text-gray-500">
-                                                    Tidak ada data CPL
-                                                </td>
-                                            </tr>
-                                        )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* CPMK */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[700px] border border-gray-900 dark:border-gray-700 text-sm">
-                                <thead>
-                                    <tr className="bg-gray-50 dark:bg-gray-850">
-                                        <th colSpan="3" className="border border-gray-900 dark:border-gray-700 p-2 font-semibold text-left">
-                                            Capaian Pembelajaran Mata Kuliah (CPMK)
-                                        </th>
-                                    </tr>
-                                    <tr className="bg-gray-50 dark:bg-gray-850">
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-32">Kode CPMK</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2">Deskripsi</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-40">CPL Terkait</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rpsData?.cpmk?.map((cpmk) => (
-                                        <tr key={cpmk.id}>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">{cpmk.kode_cpmk}</td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">{cpmk.deskripsi}</td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">-</td>
-                                        </tr>
-                                    )) || (
-                                            <tr>
-                                                <td colSpan="3" className="border border-gray-900 dark:border-gray-700 p-4 text-center text-gray-500">
-                                                    Tidak ada data CPMK
-                                                </td>
-                                            </tr>
-                                        )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Rencana Pembelajaran per Minggu */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[900px] border border-gray-900 dark:border-gray-700 text-sm">
-                                <thead className="bg-gray-100 dark:bg-gray-800">
-                                    <tr>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-16">Minggu</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-32">CPMK</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2">Materi</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-32">Metode</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-32">Daring/Luring</th>
-                                        <th className="border border-gray-900 dark:border-gray-700 p-2 w-20">Bobot</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((week) => (
-                                        <tr key={week} className={week === 8 || week === 15 ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2 text-center font-medium">{week}</td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">
-                                                {week === 8 ? 'UTS' : week === 15 ? 'UAS' : '-'}
-                                            </td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">
-                                                {week === 8 ? 'Ujian Tengah Semester' : week === 15 ? 'Ujian Akhir Semester' : '-'}
-                                            </td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">-</td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2">-</td>
-                                            <td className="border border-gray-900 dark:border-gray-700 p-2 text-center font-medium">
-                                                {week === 8 ? '22%' : week === 15 ? '26%' : week <= 7 ? '4%' : '-'}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
