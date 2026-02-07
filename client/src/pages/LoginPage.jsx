@@ -120,7 +120,9 @@ export default function LoginPage() {
                             )}
                         </button>
                     </form>
+                </div>
 
+                    
                 {/* Footer */}
                 <p className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
                     © 2026 Institut Teknologi dan Kesehatan Mahardika
