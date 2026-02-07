@@ -122,7 +122,7 @@ rps/
 - Node.js 18+
 - PostgreSQL 14+
 
-### Installation
+### Local Development
 
 1. **Clone repository:**
    ```bash
@@ -158,6 +158,43 @@ Admin: admin@university.edu / admin123
 Kaprodi: kaprodi@university.edu / password123
 Dosen: dosen@university.edu / password123
 ```
+
+---
+
+## 🌐 Production Deployment
+
+### VPS Deployment (Ubuntu 22.04 + CyberPanel)
+
+**Quick Deploy:**
+```bash
+# 1. Clone repository ke VPS
+git clone https://github.com/bangjamz/rps-management-system.git /var/www/rps
+cd /var/www/rps
+
+# 2. Edit konfigurasi deployment
+nano deployment/deploy.sh
+# Sesuaikan: APP_DIR, DOMAIN, DB_PASSWORD
+
+# 3. Jalankan auto deployment
+sudo ./deployment/deploy.sh
+```
+
+**Dokumentasi Lengkap:**
+- 📖 [Deployment Guide](./deployment/DEPLOYMENT_GUIDE.md) - Step-by-step deployment
+- 🖥️ [VPS Setup Guide](./docs/deployment/vps-setup.md) - Initial server setup
+- 🔧 [Troubleshooting](./docs/deployment/troubleshooting.md) - Solve common issues
+
+**Update Aplikasi:**
+```bash
+cd /var/www/rps
+sudo ./deployment/update.sh
+```
+
+**Tech Stack Production:**
+- **Process Manager:** PM2 (cluster mode)
+- **Web Server:** Nginx (reverse proxy + static files)
+- **Database:** PostgreSQL 14+
+- **SSL:** Let's Encrypt (via CyberPanel/Certbot)
 
 ---
 
