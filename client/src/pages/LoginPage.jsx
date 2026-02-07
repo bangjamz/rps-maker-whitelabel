@@ -121,23 +121,6 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {/* Demo Credentials */}
-                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Demo Credentials:</p>
-                        <div className="space-y-1 text-xs">
-                            <p className="text-gray-600 dark:text-gray-300">
-                                <strong>Kaprodi:</strong> kaprodi_informatika / password123
-                            </p>
-                            <p className="text-gray-600 dark:text-gray-300">
-                                <strong>Dosen:</strong> dosen_andi / password123
-                            </p>
-                            <p className="text-gray-600 dark:text-gray-300">
-                                <strong>Mahasiswa:</strong> mahasiswa_andi / password123
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Footer */}
                 <p className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
                     © 2026 Institut Teknologi dan Kesehatan Mahardika
